@@ -1,15 +1,18 @@
 module Main where
 
 import Prelude
+import Control.Monad.Trans.Class (lift)
 import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Console (CONSOLE, log)
 import Control.Monad.Eff.Exception (EXCEPTION)
 
-import Pux (start, noEffects, FoldP)
-import Pux.Renderer.React (renderToDOM)
-import Text.Smolder.Markup (Markup, text)
-import Signal (Signal)
-import Signal.Channel (CHANNEL)
+import Thermite as T
+import React as R
+import React.DOM as R
+import React.DOM.Props as RP
+import ReactDOM as RDOM
+import DOM (DOM)
 
 
 data State = State
@@ -17,26 +20,31 @@ data State = State
 initialState :: State
 initialState = State
 
-data Event = Event
-
-foldp :: forall eff. FoldP State Event eff
-foldp Event State = noEffects State
-
-view :: forall handler. State -> Markup handler
-view State = text ":D"
-
-inputs :: Array (Signal Event)
-inputs = []
+data Action = Action
 
 
-main :: forall e
-      . Eff ( console   :: CONSOLE
-            , channel   :: CHANNEL
-            , exception :: EXCEPTION
-            | e) Unit
+render :: T.Render State _ Action
+render dispatch _ state _ =
+  [ R.text "yooo"
+  , R.button [RP.onClick \_ -> dispatch Action] [R.text "click"]
+  ]
+
+performAction :: T.PerformAction _ State _ Action
+performAction Action _ _ = do
+  lift $ liftEff $ log "clicked"
+  void $ T.cotransform $ \State -> State
+
+
+spec :: T.Spec _ State _ Action
+spec = T.simpleSpec performAction render
+
+
+main :: forall eff
+      . Eff ( console :: CONSOLE
+            , dom :: DOM
+            | eff
+            ) Unit
 main = do
   log "Hello sailor!"
 
-  app <- start
-    {initialState, foldp, view, inputs}
-  renderToDOM "#app" app.markup app.input
+  T.defaultMain spec initialState unit

@@ -7,11 +7,13 @@
     "output"
   ],
   "dependencies": {
-    "purescript-prelude": "^3.1.0",
-    "purescript-console": "^3.0.0",
-    "purescript-pux": "^10.0.0"
+    "purescript-prelude": "3.x",
+    "purescript-console": "3.x",
+    "purescript-react": "3.x",
+    "purescript-react-dom": "3.x",
+    "purescript-thermite": "^4.1.1"
   },
   "devDependencies": {
-    "purescript-psci-support": "^3.0.0"
+    "purescript-psci-support": "3.x"
   }
 }
