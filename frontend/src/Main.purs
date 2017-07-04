@@ -31,7 +31,7 @@ render dispatch _ state _ =
 
 performAction :: T.PerformAction _ State _ Action
 performAction Action _ _ = do
-  lift $ liftEff $ log "clicked"
+  liftEff $ log "clicked"
   void $ T.cotransform $ \State -> State
 
 
