@@ -1,0 +1,31 @@
+{
+  "name": "monerodo",
+  "version": "0.0.0",
+  "description": "",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+ssh://git@github.com/athanclark/mos-ui.git"
+  },
+  "author": "Athan Clark <athan.clark@gmail.com>",
+  "license": "WTFPL",
+  "bugs": {
+    "url": "https://github.com/athanclark/mos-ui/issues"
+  },
+  "homepage": "https://github.com/athanclark/mos-ui#readme",
+  "dependencies": {
+    "react": "^15.6.1",
+    "react-dom": "^15.6.1"
+  },
+  "devDependencies": {
+    "bower": "^1.8.0",
+    "browserify": "^14.4.0",
+    "uglify-js": "^3.0.22"
+  }
+}
