@@ -23,5 +23,5 @@ spec = T.simpleSpec performAction render
     render :: T.Render State _ (Showable Action)
     render dispatch _ _ _ =
       [ R.text ":D"
-      , R.button [ RP.onClick \_ -> dispatch ShowSidebar ] [ R.text "Show Sidebar" ]
+      , R.button [RP.onClick \_ -> dispatch ShowSidebar] [R.text "Show Sidebar"]
       ]

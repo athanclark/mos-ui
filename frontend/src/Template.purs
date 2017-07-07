@@ -43,6 +43,17 @@ data Showable a = ShowSidebar | Showable a
 data Hideable a = HideSidebar | Hideable a
 
 
+_Showable :: forall a. Prism' (Showable a) a
+_Showable = prism' Showable (\x -> case x of
+                                Showable y -> Just y
+                                _          -> Nothing)
+
+_Hideable :: forall a. Prism' (Hideable a) a
+_Hideable = prism' Hideable (\x -> case x of
+                                Hideable y -> Just y
+                                _          -> Nothing)
+
+
 _content :: forall content sidebar. Lens' (State content sidebar) content
 _content = lens _.content (_ {content = _})
 
@@ -95,8 +106,19 @@ spec contentSpec sidebarSpec = T.simpleSpec performAction render
 
     render :: T.Render (State contentState sidebarState) props (Action contentAction sidebarAction)
     render dispatch props state children =
-      [ R.div [RP.className "pusher"] $
-          (contentSpec' ^. T._render) dispatch props state children
+      [ R.div [RP.className "pusher"]
+          [ R.div [RP.className "ui one column page grid"]
+              [ R.div [RP.className "column"] $
+                  (contentSpec' ^. T._render) dispatch props state children
+              ]
+          , R.button [ RP.className "ui orange button"
+                     , RP.onClick \_ -> dispatch ShowSidebarAction
+                     , RP.style {position: "absolute", bottom: 0, right: 0, margin: "0.5em"}
+                     ]
+            [ R.i [RP.className "icon tasks"] []
+            , R.text "Tasks"
+            ]
+          ]
       , R.div [ RP.className "ui right sidebar inverted vertical menu"
               , RP._id "tasks"
               ] $
