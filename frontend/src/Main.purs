@@ -39,23 +39,23 @@ initialState =
       { prefix : []
       , cursor :
             { label : "Node"
-            , page  : Content.initialState
+            , page  : Content.NodeState
             }
       , suffix :
           [ { label : "Mining"
-            , page  : Content.initialState
+            , page  : Content.MiningState
             }
           , { label : "Pool"
-            , page  : Content.initialState
+            , page  : Content.PoolState
             }
           , { label : "Wallet"
-            , page  : Content.initialState
+            , page  : Content.WalletState
             }
           , { label : "Explorer"
-            , page  : Content.initialState
+            , page  : Content.ExplorerState
             }
           , { label : "Payment"
-            , page  : Content.initialState
+            , page  : Content.PaymentState
             }
           ]
       }

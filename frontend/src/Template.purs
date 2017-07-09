@@ -106,10 +106,16 @@ spec contentSpec sidebarSpec = T.simpleSpec performAction render
 
     render :: T.Render (State contentState sidebarState) props (Action contentAction sidebarAction)
     render dispatch props state children =
-      [ R.div [RP.className "pusher"]
+      [ R.div [ RP.className "ui right sidebar inverted vertical menu"
+              , RP._id "tasks"
+              , RP.style {padding: "1em", color: "#fff"}
+              ] $
+          (sidebarSpec' ^. T._render) dispatch props state children
+      , R.div [RP.className "pusher"]
           [ R.div [RP.className "ui one column page grid"]
               [ R.div [RP.className "column"] $
-                  (contentSpec' ^. T._render) dispatch props state children
+                [ R.h1 [RP.className "ui dividing header"] [R.text "Monerodo"]
+                ] <> (contentSpec' ^. T._render) dispatch props state children
               ]
           , R.button [ RP.className "ui orange button"
                      , RP.onClick \_ -> dispatch ShowSidebarAction
@@ -119,10 +125,6 @@ spec contentSpec sidebarSpec = T.simpleSpec performAction render
             , R.text "Tasks"
             ]
           ]
-      , R.div [ RP.className "ui right sidebar inverted vertical menu"
-              , RP._id "tasks"
-              ] $
-          (sidebarSpec' ^. T._render) dispatch props state children
       ]
 
     contentSpec' :: T.Spec _ (State contentState sidebarState) props (Action contentAction sidebarAction)

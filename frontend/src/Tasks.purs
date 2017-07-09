@@ -22,6 +22,10 @@ spec = T.simpleSpec performAction render
     performAction _ _ _ = pure unit
     render :: T.Render State _ (Hideable Action)
     render dispatch _ _ _ =
-      [ R.text ":O"
-      , R.button [ RP.onClick \_ -> dispatch HideSidebar ] [ R.text "Hide Sidebar" ]
+      [ R.h2  [ RP.className "ui dividing header"
+              , RP.style {color: "#fff", borderBottom: "1px solid white"}
+              ] [R.text "Tasks"]
+      , R.button [ RP.className "ui button"
+                 , RP.onClick \_ -> dispatch HideSidebar
+                 ] [R.text "Hide Sidebar"]
       ]
