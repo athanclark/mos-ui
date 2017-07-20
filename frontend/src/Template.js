@@ -1,10 +1,10 @@
 "use strict";
 
 
-exports.sidebarHide = function sidebarHide (sel) {
-  $(sel).sidebar('hide');
+exports.sidebarShow = function sidebarShow () {
+  $("#tasks").sidebar('show');
 };
 
-exports.sidebarShow = function sidebarShow (sel) {
-  $(sel).sidebar('show');
+exports.sidebarHide = function sidebarHide () {
+  $("#tasks").sidebar('hide');
 };

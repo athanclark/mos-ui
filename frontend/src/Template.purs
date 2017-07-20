@@ -4,9 +4,10 @@ import Prelude
 
 import Data.Lens.Lens (Lens', lens)
 import Data.Lens.Getter ((^.))
-import Data.Lens.Prism (Prism', prism')
+import Data.Lens.Prism (APrism, Prism', prism', matching, clonePrism, review)
 import Data.Maybe (Maybe (..))
-import Control.Monad.Eff (kind Effect)
+import Data.Either (Either (..))
+import Control.Monad.Eff (Eff, kind Effect)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Uncurried (EffFn1, runEffFn1)
 import Control.Monad.Eff.Console (CONSOLE)
@@ -21,22 +22,28 @@ import ReactDOM as RDOM
 type State content sidebar =
   { content :: content
   , sidebar :: sidebar
+  , changed :: Boolean
   }
 
 initialState :: forall content sidebar. content -> sidebar -> State content sidebar
-initialState content sidebar = {content, sidebar}
+initialState content sidebar =
+  { content
+  , sidebar
+  , changed : false
+  }
 
 data Action content sidebar
   = ContentAction content
   | SidebarAction sidebar
   | ShowSidebarAction
   | HideSidebarAction
+  | ApplyChangesAction
 
 
 foreign import data SIDEBAR :: Effect
 
-foreign import sidebarShow :: forall eff. EffFn1 (sidebar :: SIDEBAR | eff) String Unit
-foreign import sidebarHide :: forall eff. EffFn1 (sidebar :: SIDEBAR | eff) String Unit
+foreign import sidebarShow :: forall eff. Eff (sidebar :: SIDEBAR | eff) Unit
+foreign import sidebarHide :: forall eff. Eff (sidebar :: SIDEBAR | eff) Unit
 
 
 data Showable a = ShowSidebar | Showable a
@@ -81,6 +88,22 @@ _Hide = prism' make get
     get _ = Nothing
 
 
+_mkShow :: forall s a. APrism s s a a -> Prism' (Showable s) (Showable a)
+_mkShow p = prism' make get
+  where
+    make :: Showable a -> Showable s
+    make = case _ of
+      ShowSidebar -> ShowSidebar
+      Showable x  -> Showable (review (clonePrism p) x)
+
+    get :: Showable s -> Maybe (Showable a)
+    get = case _ of
+      ShowSidebar -> Just ShowSidebar
+      Showable x  -> case matching p x of
+        Left _  -> Nothing
+        Right x -> Just (Showable x)
+
+
 
 spec :: forall eff props contentState sidebarState contentAction sidebarAction
       . T.Spec ( console :: CONSOLE
@@ -96,10 +119,10 @@ spec contentSpec sidebarSpec = T.simpleSpec performAction render
   where
     performAction :: T.PerformAction _ (State contentState sidebarState) props (Action contentAction sidebarAction)
     performAction ShowSidebarAction props state = do
-      liftEff $ runEffFn1 sidebarShow "#tasks"
+      liftEff sidebarShow
       ((contentSpec' <> sidebarSpec') ^. T._performAction) ShowSidebarAction props state
     performAction HideSidebarAction props state = do
-      liftEff $ runEffFn1 sidebarHide "#tasks"
+      liftEff sidebarHide
       ((contentSpec' <> sidebarSpec') ^. T._performAction) HideSidebarAction props state
     performAction a props state =
       ((contentSpec' <> sidebarSpec') ^. T._performAction) a props state
@@ -116,10 +139,16 @@ spec contentSpec sidebarSpec = T.simpleSpec performAction render
               [ R.div [RP.className "column"] $
                 [ R.h1 [RP.className "ui dividing header"] [R.text "Monerodo"]
                 ] <> (contentSpec' ^. T._render) dispatch props state children
+                  <> [ R.button [ RP.className "ui button primary"
+                                , RP.onClick \_ -> dispatch ApplyChangesAction
+                                ]
+                         [ R.text "Apply Changes"
+                         ]
+                     ]
               ]
           , R.button [ RP.className "ui orange button"
                      , RP.onClick \_ -> dispatch ShowSidebarAction
-                     , RP.style {position: "absolute", bottom: 0, right: 0, margin: "0.5em"}
+                     , RP.style {position: "fixed", bottom: 0, right: 0, margin: "0.5em"}
                      ]
             [ R.i [RP.className "icon tasks"] []
             , R.text "Tasks"

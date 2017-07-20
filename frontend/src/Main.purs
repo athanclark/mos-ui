@@ -4,6 +4,12 @@ import Template (SIDEBAR, _Showable)
 import Template as Template
 import Tabular as Tabular
 import Content as Content
+import Content.Node as Node
+import Content.Mining as Mining
+import Content.Pool as Pool
+import Content.Wallet as Wallet
+import Content.Explorer as Explorer
+import Content.Payment as Payment
 import Tasks as Tasks
 
 import Prelude
@@ -39,23 +45,23 @@ initialState =
       { prefix : []
       , cursor :
             { label : "Node"
-            , page  : Content.NodeState
+            , page  : Content.NodeState Node.initialState
             }
       , suffix :
           [ { label : "Mining"
-            , page  : Content.MiningState
+            , page  : Content.MiningState Mining.initialState
             }
           , { label : "Pool"
-            , page  : Content.PoolState
+            , page  : Content.PoolState Pool.initialState
             }
           , { label : "Wallet"
-            , page  : Content.WalletState
+            , page  : Content.WalletState Wallet.initialState
             }
           , { label : "Explorer"
-            , page  : Content.ExplorerState
+            , page  : Content.ExplorerState Explorer.initialState
             }
           , { label : "Payment"
-            , page  : Content.PaymentState
+            , page  : Content.PaymentState Payment.initialState
             }
           ]
       }
@@ -78,23 +84,7 @@ spec :: forall eff props
                , sidebar :: SIDEBAR
                | eff) State props Action
 spec = T.focus _template _TemplateAction
-     $ Template.spec (Tabular.spec Content.spec) Tasks.spec -- T.simpleSpec performAction render
-  -- where
-  --   performAction :: T.PerformAction _ State props Action
-  --   performAction Action _ _ = do
-  --     liftEff $ log "clicked"
-  --     void $ T.cotransform $ \State -> State
-
-  --   render :: T.Render State props Action
-  --   render dispatch props state children =
-  --     [ R.div [RP.className "pusher"]
-  --         [ R.text "yooo"
-  --         , R.button [RP.onClick \_ -> dispatch Action] [R.text "click"]
-  --         ]
-  --     , R.div [ RP.className "ui sidebar inverted vertical menu"
-  --             , RP._id "tasks"
-  --             ] []
-  --     ]
+     $ Template.spec (Tabular.spec Content.spec) Tasks.spec
 
 
 main :: forall eff
