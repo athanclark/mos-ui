@@ -9,3 +9,4 @@ This monero-node organization utility manages the following processes and featur
 - [Fluffypony's openmonero web-based wallet](https://github.com/moneroexamples/openmonero)
 - [omw12's monero blockchain explorer](https://github.com/moneroexamples/onion-monero-blockchain-explorer)
 - [amiuhle's payment acceptance service](https://github.com/amiuhle/kasisto)
+- [___](https://github.com/sammy007/monero-stratum)
