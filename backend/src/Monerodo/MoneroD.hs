@@ -4,22 +4,24 @@
 
 module Monerodo.MoneroD where
 
-import Data.Attoparsec.Text (Parser, string)
+import Data.Attoparsec.Path (absFilePath)
+import Data.Attoparsec.Text (Parser, string, decimal, sepBy, endOfLine)
 import Data.Text (Text, pack)
 import Data.Conduit (Producer, (=$=), ($$))
 import Data.Conduit.Attoparsec (sinkParser)
 import Data.Conduit.Binary (sourceFile)
 import qualified Data.Conduit.Binary as B
 import Data.Conduit.Text (decode, utf8)
-import Control.Applicative (many)
+import Control.Applicative (many, (<|>))
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.Trans.Resource (MonadResource)
+import Path (Path, Abs, File, toFilePath)
 
 
 
 data MoneroDConfig
   = MaxConcurrency Int
-  | DataDir FilePath
+  | DataDir (Path Abs File)
   | EnforceDnsCheckpointing Bool
   | MaxThreadsPrepBlocks Int
   | FastBlockSync Bool
@@ -42,7 +44,7 @@ data MoneroDConfig
 
 instance Show MoneroDConfig where
   show (MaxConcurrency x) = "max-concurrency=" ++ show x
-  show (DataDir x) = "data-dir=" ++ x
+  show (DataDir x) = "data-dir=" ++ toFilePath x
   show (EnforceDnsCheckpointing x) = "enforce-dns-checkpointing=" ++ show (if x then 1 else 0)
   show (MaxThreadsPrepBlocks x) = "prep-blocks-threads=" ++ show x
   show (FastBlockSync x) = "fast-block-sync=" ++ show (if x then 1 else 0)
@@ -67,23 +69,50 @@ mkConfig :: [MoneroDConfig] -> String
 mkConfig xs = unlines $ show <$> xs
 
 
-
-data MoneroDLog
-  = Foo
-  deriving (Show)
-
-logParser :: Parser MoneroDLog
-logParser =
+configParser :: Parser MoneroDConfig
+configParser
+   =  parseMaxConcurrency
+  <|> parseDataDir
+  <|> parseEnforceDnsCheckpointing
+  <|> parseMaxThreadsPrep
+  <|> parseFastBlockSync
   where
     parseMaxConcurrency = do
       string "max-concurrency="
       MaxConcurrency <$> decimal
     parseDataDir = do
       string "data-dir="
-      DataDir <$> 
+      DataDir <$> absFilePath
+    parseEnforceDnsCheckpointing = do
+      string "enforce-dns-checkpointing="
+      (EnforceDnsCheckpointing . (/= 0)) <$> decimal
+    parseMaxThreadsPrep = do
+      string "prep-blocks-threads="
+      MaxThreadsPrepBlocks <$> decimal
+    parseFastBlockSync = do
+      string "fast-block-sync="
+      (FastBlockSync . (/= 0)) <$> decimal
+    parseBlockSyncSize = do
+      string "block-sync-size="
+      BlockSyncSize <$> decimal
+    parseP2PBindPort = do
+      string "p2p-bind-port="
+      BlockSyncSize <$> decimal
 
-parseLogStream :: ( MonadThrow m
-                  , MonadResource m
-                  )
-               => FilePath -> m [MoneroDLog]
-parseLogStream f = sourceFile f =$= B.lines =$= decode utf8 $$ sinkParser (many logParser)
+parseConfigStream ::  ( MonadThrow m
+                      , MonadResource m
+                      )
+                  => FilePath -> m [MoneroDConfig]
+parseConfigStream f = sourceFile f {-=$= B.lines-} =$= decode utf8 $$ sinkParser (configParser `sepBy` endOfLine)
+
+
+
+data MoneroDLog
+  = Foo
+  deriving (Show)
+
+-- parseLogStream :: ( MonadThrow m
+--                   , MonadResource m
+--                   )
+--                => FilePath -> m [MoneroDLog]
+-- parseLogStream f = sourceFile f =$= B.lines =$= decode utf8 $$ sinkParser (many logParser)

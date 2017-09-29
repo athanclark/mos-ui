@@ -15,8 +15,17 @@ cabal-version:       >=1.10
 
 library
   hs-source-dirs:      src
-  exposed-modules:     Lib
+  exposed-modules:     Monerodo.MoneroD
   build-depends:       base >= 4.7 && < 5
+                     , attoparsec
+                     , attoparsec-path
+                     , conduit
+                     , conduit-extra
+                     , exceptions
+                     , ip
+                     , resourcet
+                     , text
+                     , path
   default-language:    Haskell2010
 
 executable mos-ui
@@ -24,7 +33,7 @@ executable mos-ui
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   build-depends:       base
-                     , backend
+                     , mos-ui
   default-language:    Haskell2010
 
 test-suite mos-ui-test
@@ -32,7 +41,7 @@ test-suite mos-ui-test
   hs-source-dirs:      test
   main-is:             Spec.hs
   build-depends:       base
-                     , backend
+                     , mos-ui
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
 
