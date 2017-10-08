@@ -1,0 +1,19 @@
+{
+  "name": "mos-ui",
+  "ignore": [
+    "**/.*",
+    "node_modules",
+    "bower_components",
+    "output"
+  ],
+  "dependencies": {
+    "purescript-prelude": "^3.1.0",
+    "purescript-console": "^3.0.0",
+    "purescript-electron": "git://github.com/athanclark/purescript-electron.git#56de833454f16367169ef63039fda5cc8add9148",
+    "purescript-thermite": "^5.0.0",
+    "purescript-node-process": "^5.0.0"
+  },
+  "devDependencies": {
+    "purescript-psci-support": "^3.0.0"
+  }
+}
