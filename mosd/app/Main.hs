@@ -1,6 +1,11 @@
 module Main where
 
-import Lib
+import Types (runAppM)
+import Types.Env (mkEnv)
+import Daemon (daemon)
+
 
 main :: IO ()
-main = someFunc
+main = do
+  env <- mkEnv
+  runAppM env daemon

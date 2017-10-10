@@ -9,9 +9,12 @@
   "dependencies": {
     "purescript-prelude": "^3.1.0",
     "purescript-console": "^3.0.0",
-    "purescript-electron": "git://github.com/athanclark/purescript-electron.git#56de833454f16367169ef63039fda5cc8add9148",
+    "purescript-electron": "git://github.com/athanclark/purescript-electron.git#136223b315129340dec1e15a55286bf08a4c21e0",
+    "purescript-dbus": "git://github.com/athanclark/purescript-dbus.git#0e06620943c3c0fae898af4b6f9a94486b852208",
+    "purescript-material-ui": "git://github.com/athanclark/purescript-material-ui.git#18e3b7e3e474a28c8a8c9816e59ff15f9a427854",
     "purescript-thermite": "^5.0.0",
-    "purescript-node-process": "^5.0.0"
+    "purescript-node-process": "^5.0.0",
+    "purescript-queue": "^0.5.0"
   },
   "devDependencies": {
     "purescript-psci-support": "^3.0.0"
