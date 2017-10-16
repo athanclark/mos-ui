@@ -1,32 +1,53 @@
 {-# LANGUAGE
     OverloadedStrings
+  , NamedFieldPuns
+  , RecordWildCards
+  , Rank2Types
+  , FlexibleContexts
   #-}
 
 module Monerodo.MoneroD where
 
+import Types (MonadApp)
+
+import Data.Attoparsec.Text (Parser, string, decimal, sepBy, endOfLine, eitherP, takeWhile1, char, parseOnly)
 import Data.Attoparsec.Path (absFilePath)
 import Data.Attoparsec.IP (ipv4, ipv6)
-import Data.Attoparsec.Text (Parser, string, decimal, sepBy, endOfLine, eitherP, takeWhile1, char)
 import Data.Attoparsec.Time (localTime)
 import Data.Text (Text, pack, unpack)
 import Data.Conduit (Producer, (=$=), ($$))
 import Data.Conduit.Attoparsec (sinkParser)
 import Data.Conduit.Binary (sourceFile)
 import qualified Data.Conduit.Binary as B
+import qualified Data.ByteString as BS
 import Data.Conduit.Text (decode, utf8)
 import Data.Char (isControl, isSpace)
 import Data.URI.Auth (URIAuth, parseURIAuth)
 import Data.Time (UTCTime)
 import Data.Time.LocalTime (TimeZone, localTimeToUTC)
-import Control.Applicative (many, optional, (<|>))
+import Data.Vector (Vector)
+import Data.Aeson (ToJSON (..), FromJSON (..), (.:), (.=), object, Value (Object, String))
+import Data.Aeson.Types (typeMismatch)
+import Control.Applicative (optional, (<|>))
+import Control.Alternative.Vector (manyV)
 import Control.Monad (void)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.Trans.Resource (MonadResource)
+import Text.Read (readMaybe)
 import Path (Path, Abs, File, toFilePath)
 import Net.Types (IPv4, IPv6)
 import qualified Net.IPv4.Text as IPv4
 import qualified Net.IPv6.Text as IPv6
 
+
+instance ToJSON URIAuth where
+  toJSON x = toJSON $ show x
+
+instance FromJSON URIAuth where
+  parseJSON (String x) = case parseOnly parseURIAuth x of
+    Left e -> fail e
+    Right x -> pure x
+  parseJSON x = typeMismatch "URIAuth" x
 
 
 data MoneroDConfig
@@ -196,7 +217,16 @@ withTimestamp timeZone content = do
     }
 
 data SyncPolarity = INC | OUT
-  deriving (Show)
+  deriving (Show, Read)
+
+instance ToJSON SyncPolarity where
+  toJSON x = toJSON (show x)
+
+instance FromJSON SyncPolarity where
+  parseJSON (String s) = case readMaybe $ unpack s of
+    Nothing -> fail "Not a SyncPolarity"
+    Just p -> pure p
+  parseJSON x = typeMismatch "SyncPolarity" x
 
 syncPolarity :: Parser SyncPolarity
 syncPolarity =
@@ -232,6 +262,67 @@ data MoneroDLog
   | MoneroDOther Text
   deriving (Show)
 
+instance ToJSON MoneroDLog where
+  toJSON (MoneroDOther _) = String ""
+  toJSON (SyncProgress{..}) = object
+    [ "progress" .= object
+      [ "amount" .= syncProgressAmount
+      , "total" .= syncProgressTotal
+      , "host" .= syncProgressHost
+      , "peer" .= syncProgressPeer
+      , "polarity" .= syncProgressPolarity
+      ]
+    ]
+  toJSON (SyncNewTopBlock{..}) = object
+    [ "newTopBlock" .= object
+      [ "host" .= syncNewTopBlockHost
+      , "polarity" .= syncNewTopBlockPolarity
+      , "peer" .= syncNewTopBlockPeer
+      , "top" .= syncNewTopBlockTop
+      , "current" .= syncNewTopBlockCurrent
+      , "behind" .= syncNewTopBlockBehind
+      , "days" .= syncNewTopBlockDays
+      ]
+    ]
+
+instance FromJSON MoneroDLog where
+  parseJSON (Object o) = parseProgress <|> parseNewTopBlock
+    where
+      parseProgress = do
+        o' <- o .: "progress"
+        syncProgressAmount <- o' .: "amount"
+        syncProgressTotal <- o' .: "total"
+        syncProgressHost <- o' .: "host"
+        syncProgressPeer <- o' .: "peer"
+        syncProgressPolarity <- o' .: "polarity"
+        pure SyncProgress
+          { syncProgressAmount
+          , syncProgressHost
+          , syncProgressTotal
+          , syncProgressPeer
+          , syncProgressPolarity
+          }
+      parseNewTopBlock = do
+        o' <- o .: "newTopBlock"
+        syncNewTopBlockTop <- o' .: "top"
+        syncNewTopBlockPeer <- o' .: "peer"
+        syncNewTopBlockHost <- o' .: "host"
+        syncNewTopBlockDays <- o' .: "days"
+        syncNewTopBlockBehind <- o' .: "behind"
+        syncNewTopBlockCurrent <- o' .: "current"
+        syncNewTopBlockPolarity <- o' .: "polarity"
+        pure SyncNewTopBlock
+          { syncNewTopBlockPolarity
+          , syncNewTopBlockCurrent
+          , syncNewTopBlockBehind
+          , syncNewTopBlockDays
+          , syncNewTopBlockHost
+          , syncNewTopBlockPeer
+          , syncNewTopBlockTop
+          }
+  parseJSON x = typeMismatch "MoneroDLog" x
+
+
 data MoneroDLogType = ERROR | WARN | INFO
   deriving (Show)
 
@@ -239,8 +330,8 @@ monerodLogType :: Parser MoneroDLogType
 monerodLogType =
   let info = INFO <$ string "INFO"
       warn = WARN <$ string "WARN"
-      error = ERROR <$ string "ERROR"
-  in  info <|> warn <|> error
+      error' = ERROR <$ string "ERROR"
+  in  info <|> warn <|> error'
 
 data NetScope = DNS | P2P | CN
   deriving (Show)
@@ -250,7 +341,7 @@ netScope =
   let dns = DNS <$ string ".dns"
       p2p = P2P <$ string ".p2p"
       cn  = CN  <$ string ".cn"
-  in  dns <|> p2p
+  in  dns <|> p2p <|> cn
 
 data MoneroDLogScope = Global | Net (Maybe NetScope)
   deriving (Show)
@@ -259,7 +350,7 @@ monerodLogScope :: Parser MoneroDLogScope
 monerodLogScope =
   let global = Global <$ string "global"
       netDNS = do
-        string "net"
+        _ <- string "net"
         Net <$> optional netScope
   in  global <|> netDNS
 
@@ -327,8 +418,5 @@ monerodLog = do
       other = MoneroDOther <$> takeWhile1 (/= '\n')
   syncProgress <|> syncNewTopBlock <|> other
 
--- parseLogStream :: ( MonadThrow m
---                   , MonadResource m
---                   )
---                => FilePath -> m [MoneroDLog]
--- parseLogStream f = sourceFile f =$= B.lines =$= decode utf8 $$ sinkParser (many logParser)
+parseLogStream :: MonadApp stM m => TimeZone -> Producer m BS.ByteString -> m (Vector (WithTimestamp MoneroDLog))
+parseLogStream tz x = x =$= B.lines =$= decode utf8 $$ sinkParser (manyV (withTimestamp tz monerodLog))

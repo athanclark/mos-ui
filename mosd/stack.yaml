@@ -43,7 +43,9 @@ extra-deps:
   - attoparsec-ip-0.0.0
   - attoparsec-path-0.0.0.1
   - attoparsec-uri-0.0.2
+  - alternative-vector-0.0.0
   - ip-0.9.3
+  - follow-file-0.0.2
   - logging-3.0.4
 
 # Override default flag values for local packages and extra-deps

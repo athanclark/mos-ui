@@ -22,3 +22,7 @@ monerodoControl = "com.moneroworld.Control"
 
 monerodoControlMethod :: MemberName
 monerodoControlMethod = "Control"
+
+
+monerodoSignalMethod :: MemberName
+monerodoSignalMethod = "Signal"

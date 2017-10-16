@@ -13,7 +13,7 @@ import Control.Logging (log')
 import Control.Concurrent (threadDelay)
 
 
-control :: MonadApp m => ControlInput -> m ControlOutput
+control :: MonadApp stM m => ControlInput -> m ControlOutput
 control Foo = do
   log' "Control Called!"
   liftIO $ threadDelay 500000

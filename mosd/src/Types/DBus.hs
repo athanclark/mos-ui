@@ -4,7 +4,8 @@
 
 module Types.DBus where
 
-import Data.Aeson (ToJSON (..), FromJSON (..), Value (..), encode, decode)
+import Monerodo.MoneroD (MoneroDLog)
+import Data.Aeson (ToJSON (..), FromJSON (..), Value (..), encode, decode, (.:), (.=), object)
 import Data.Aeson.Types (typeMismatch)
 import qualified Data.Text.Lazy.Encoding as LT
 import DBus.Internal.Types (IsVariant (..), IsValue (..), Type (TypeString))
@@ -52,3 +53,23 @@ instance IsValue ControlOutput where
   toValue x = toValue $ LT.decodeUtf8 $ encode x
   fromValue x = (decode . LT.encodeUtf8) =<< fromValue x
 
+
+
+data SignalOutput
+  = MoneroDLogSignal MoneroDLog
+
+instance ToJSON SignalOutput where
+  toJSON (MoneroDLogSignal l) = object ["monerod" .= l]
+
+instance FromJSON SignalOutput where
+  parseJSON (Object o) = MoneroDLogSignal <$> o .: "monerod"
+  parseJSON x = typeMismatch "SignalOutput" x
+
+instance IsVariant SignalOutput where
+  toVariant x = toVariant $ LT.decodeUtf8 $ encode x
+  fromVariant x = (decode . LT.encodeUtf8) =<< fromVariant x
+
+instance IsValue SignalOutput where
+  typeOf _ = TypeString
+  toValue x = toValue $ LT.decodeUtf8 $ encode x
+  fromValue x = (decode . LT.encodeUtf8) =<< fromValue x
