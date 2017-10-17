@@ -14,6 +14,15 @@ for its frontend, visual user interface component. It communicates with the daem
 and invokes remote procedures that way as well.
 
 
+## Usage
+
+```bash
+npm start -- [--help] [--development]
+# or
+./mos-ui-linux-x64/mos-ui -- [--help] [--development]
+```
+
+
 ## Building
 
 ### Prerequisites

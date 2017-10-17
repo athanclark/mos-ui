@@ -14,7 +14,9 @@
     "purescript-material-ui": "git://github.com/athanclark/purescript-material-ui.git#18e3b7e3e474a28c8a8c9816e59ff15f9a427854",
     "purescript-thermite": "^5.0.0",
     "purescript-node-process": "^5.0.0",
-    "purescript-queue": "^0.5.0"
+    "purescript-queue": "^0.5.0",
+    "purescript-uri": "^4.2.0",
+    "purescript-yargs": "^3.1.0"
   },
   "devDependencies": {
     "purescript-psci-support": "^3.0.0"

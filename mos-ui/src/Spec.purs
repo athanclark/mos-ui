@@ -3,7 +3,7 @@ module Spec where
 import Spec.Page.MoneroD as MoneroD
 import Spec.Page.XmrStak as XmrStak
 import Types.DBus (ControlInput (..), ControlOutput (..), AllInputs (..))
-import Client.Constants (controlInput, controlOutput)
+import Client.Constants (controlInput, controlOutput, signalOutput)
 
 import Prelude
 import Data.Either (Either (..))
@@ -113,7 +113,8 @@ spec = T.simpleSpec ( performAction
     xmrStak = T.focus _currentPage (_PageAction <<< _XmrStakAction) $ T.split _XmrStak XmrStak.spec
 
     performAction action props state = case action of
-      IpcAction i -> pure unit -- TODO
+      IpcAction i ->
+        liftEff $ log $ "got IPC: " <> show i
       NavAction navAction -> case navAction of
         ClickedMoneroD -> void $ T.cotransform $ _ {currentPage = MoneroD MoneroD.initialState}
         ClickedXmrStak -> void $ T.cotransform $ _ {currentPage = XmrStak XmrStak.initialState}
@@ -175,6 +176,7 @@ main = do
   injectTapEvent
 
   window' <- window
+  controlQueue <- newQueue
   signalQueue <- newQueue
 
   registerAsyncHandler
@@ -182,7 +184,15 @@ main = do
     , handle: \{message} -> do
         case decodeJson message of
           Left e -> warn $ "Couldn't decode electron ipc message: " <> show e
-          Right x -> putQueue signalQueue (IpcAction x)
+          Right x -> putQueue controlQueue (IpcAction (ControlOutput x))
+    }
+
+  registerAsyncHandler
+    { channel: signalOutput
+    , handle: \{message} -> do
+        case decodeJson message of
+          Left e -> warn $ "Couldn't decode electron ipc signal: " <> show e
+          Right x -> putQueue signalQueue (IpcAction (SignalOutput x))
     }
 
   let props = unit
@@ -190,7 +200,8 @@ main = do
         spec initialState
       reactSpec' = reactSpec
         { componentDidMount = \this -> do
-            onQueue signalQueue \x -> dispatcher this x
+            onQueue signalQueue (dispatcher this)
+            onQueue controlQueue (dispatcher this)
             reactSpec.componentDidMount this
         }
       component = R.createClass reactSpec'

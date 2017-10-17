@@ -15,6 +15,9 @@ monerodoControl = InterfaceName "com.moneroworld.Control"
 monerodoControlMethod :: MemberName
 monerodoControlMethod = MemberName "Control"
 
+monerodoSignalMethod :: MemberName
+monerodoSignalMethod = MemberName "Signal"
+
 
 
 -- Electron:
@@ -24,3 +27,6 @@ controlInput = "ControlInput"
 
 controlOutput :: String
 controlOutput = "ControlOutput"
+
+signalOutput :: String
+signalOutput = "SignalOutput"
