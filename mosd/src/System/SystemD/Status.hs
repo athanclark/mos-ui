@@ -27,9 +27,9 @@ data LoadedState
 
 loadedState :: Parser (LoadedState, Text)
 loadedState = do
-  void $ string "   Loaded: "
-  let loaded = Loaded <$ string "loaded ("
-      notFound = NotFound <$ string "not-found ("
+  _ <- string "   Loaded: " <?> "loaded init"
+  let loaded = Loaded <$ string "loaded (" <?> "loaded token"
+      notFound = NotFound <$ string "not-found (" <?> "not-found token"
   l <- loaded <|> notFound
   r <- takeWhile1 (/= ')')
   void $ char ')'
@@ -288,10 +288,11 @@ data SystemDStatus = SystemDStatus
 
 systemdStatus :: Parser SystemDStatus
 systemdStatus = do
-  void $ string "● "
+  _ <- string "● " <?> "initial dot"
   name <- takeWhile1 (not . isSpace)
-  void $ string " - "
+  _ <- string " - " <?> "name-description breaker"
   description <- takeWhile1 (/= '\n')
+  void $ char '\n'
   (loadedState',loadedStateExtra) <- loadedState
   (activeState',activeStateExtra) <- activeState
   skipWhile (const True)
