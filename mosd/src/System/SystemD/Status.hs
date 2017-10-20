@@ -4,9 +4,15 @@
 
 module System.SystemD.Status where
 
+import Prelude hiding (print)
 import Data.Time (UTCTime, zonedTimeToUTC)
 import Data.Text (Text, replace)
 import Data.Char (isSpace)
+import Data.Conduit ((=$=))
+import Data.Conduit.Attoparsec (conduitParserEither, ParseError)
+import Data.Conduit.Process (sourceCmdWithConsumer)
+import Data.Conduit.Text (decode, utf8)
+import Data.Conduit.Combinators (print)
 import Data.Attoparsec.Text (Parser, char, string, takeWhile1, endOfLine, skipWhile, parseOnly, (<?>))
 import qualified Data.Attoparsec.Text as A
 import Data.Attoparsec.Time (zonedTime)
@@ -278,7 +284,7 @@ data SystemDStatus = SystemDStatus
   , systemdStatusLoadedStateExtra :: Text
   , systemdStatusActiveState :: ActiveState
   , systemdStatusActiveStateSince :: Maybe UTCTime
-  }
+  } deriving (Show)
 
 systemdStatus :: Parser SystemDStatus
 systemdStatus = do
@@ -297,3 +303,7 @@ systemdStatus = do
     , systemdStatusActiveState = activeState'
     , systemdStatusActiveStateSince = activeStateExtra
     }
+
+getServerStatus :: String -> IO ()
+getServerStatus service =
+  snd <$> sourceCmdWithConsumer ("sudo systemctl status " ++ service) (decode utf8 =$= conduitParserEither systemdStatus =$= print)
