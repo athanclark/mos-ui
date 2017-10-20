@@ -22,6 +22,7 @@ library
                        Daemon.Constants
                        Daemon.Methods
                        Monerodo.MoneroD
+                       System.SystemD.Status
   build-depends:       base >= 4.7 && < 5
                      , aeson
                      , alternative-vector
@@ -50,6 +51,7 @@ library
                      , time
                      , vector
   default-language:    Haskell2010
+  ghc-options:         -Wall
 
 executable mosd
   hs-source-dirs:      app

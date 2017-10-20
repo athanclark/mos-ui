@@ -9,7 +9,7 @@
 module Daemon where
 
 import Daemon.Constants (monerodoBus, monerodoObject, monerodoControl, monerodoControlMethod, monerodoSignalMethod)
-import Daemon.Methods (control)
+import Daemon.Methods (control, signals)
 import Types (MonadApp, MonerodoException (..))
 import Types.Env (Env (..))
 import Types.DBus (SignalOutput (..))
@@ -19,7 +19,7 @@ import Data.Singleton.Class (runSingleton)
 import Data.Monoid ((<>))
 import qualified Data.Text as T
 import qualified Data.Vector as V
-import Data.IORef (newIORef, readIORef, writeIORef)
+import Data.IORef (IORef, newIORef, readIORef, writeIORef, modifyIORef)
 import Data.Time (getCurrentTime)
 import Data.Time.LocalTime (getCurrentTimeZone)
 import Control.Monad (forever, forM_, unless)
@@ -38,22 +38,30 @@ import DBus.Client (requestName, RequestNameReply (..), releaseName, ReleaseName
 daemon :: forall stM m. MonadApp stM m => m ()
 daemon = withStderrLogging $ bracket_ getName giveName $ do
   Env{envClient,envMoneroDLogFile,envMoneroDConfigFile,envINotify} <- ask
+  (pendingSignalsRef :: IORef (V.Vector SignalOutput)) <- liftIO (newIORef V.empty)
   liftBaseWith $ \runInBase -> export envClient monerodoObject
     [ autoMethod monerodoControl monerodoControlMethod (\x -> runSingleton <$> runInBase (control x))
+    , autoMethod monerodoControl monerodoSignalMethod (runSingleton <$> runInBase (signals pendingSignalsRef))
     ]
   log' $ "Exported Object " <> T.pack (show monerodoObject)
       <> " with Interface " <> T.pack (show monerodoControl)
       <> " and Method " <> T.pack (show monerodoControlMethod)
+  log' $ "Exported Object " <> T.pack (show monerodoObject)
+      <> " with Interface " <> T.pack (show monerodoControl)
+      <> " and Method " <> T.pack (show monerodoSignalMethod)
   tz <- liftIO getCurrentTimeZone
 
   follow envINotify envMoneroDLogFile $ \latestLog -> do
-    logs <- parseLogStream tz latestLog
-    forM_ logs $ \(WithTimestamp _ log) -> case log of
-      MoneroDOther _ -> pure ()
-      _ -> liftIO $ emit envClient $ (signal monerodoObject monerodoControl monerodoSignalMethod)
-              { signalBody = [toVariant $ MoneroDLogSignal log]
-              }
-    log' "Emitting monerod signal"
+    eLogs <- parseLogStream tz latestLog
+    case eLogs of
+      Left e -> throwM e
+      Right logs -> do
+        forM_ logs $ \(WithTimestamp _ log) -> case log of
+          MoneroDOther _ -> pure ()
+          _ -> do -- liftIO $ emit envClient $ (signal monerodoObject monerodoControl monerodoSignalMethod)
+                  -- { signalBody = [toVariant $ MoneroDLogSignal log]
+                  -- }
+            liftIO $ modifyIORef pendingSignalsRef (`V.snoc` MoneroDLogSignal log)
 
   liftIO $ forever $ threadDelay 50000
   where
@@ -65,6 +73,7 @@ daemon = withStderrLogging $ bracket_ getName giveName $ do
         NameInQueue -> throwM DBusNameNotAcquired
         NameExists -> throwM DBusNameNotAcquired
         NameAlreadyOwner -> pure ()
+        _                -> pure ()
       log' $ "Obtained name " <> T.pack (show monerodoBus)
     giveName = do
       Env{envClient} <- ask
@@ -73,4 +82,5 @@ daemon = withStderrLogging $ bracket_ getName giveName $ do
         NameReleased -> pure ()
         NameNonExistent -> warn' "Monerodo bus name not existent somehow..."
         NameNotOwner -> throwM DBusNameNotAcquired
+        _            -> pure ()
       log' $ "Released name " <> T.pack (show monerodoBus)

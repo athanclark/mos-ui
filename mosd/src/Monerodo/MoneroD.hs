@@ -10,13 +10,13 @@ module Monerodo.MoneroD where
 
 import Types (MonadApp)
 
-import Data.Attoparsec.Text (Parser, string, decimal, sepBy, endOfLine, eitherP, takeWhile1, char, parseOnly)
+import Data.Attoparsec.Text (Parser, string, decimal, sepBy, endOfLine, eitherP, takeWhile1, char, parseOnly, endOfInput)
 import Data.Attoparsec.Path (absFilePath)
 import Data.Attoparsec.IP (ipv4, ipv6)
 import Data.Attoparsec.Time (localTime)
 import Data.Text (Text, pack, unpack)
 import Data.Conduit (Producer, (=$=), ($$))
-import Data.Conduit.Attoparsec (sinkParser)
+import Data.Conduit.Attoparsec (sinkParser, sinkParserEither, ParseError)
 import Data.Conduit.Binary (sourceFile)
 import qualified Data.Conduit.Binary as B
 import qualified Data.ByteString as BS
@@ -28,7 +28,7 @@ import Data.Time.LocalTime (TimeZone, localTimeToUTC)
 import Data.Vector (Vector)
 import Data.Aeson (ToJSON (..), FromJSON (..), (.:), (.=), object, Value (Object, String))
 import Data.Aeson.Types (typeMismatch)
-import Control.Applicative (optional, (<|>))
+import Control.Applicative (optional, (<|>), many)
 import Control.Alternative.Vector (manyV)
 import Control.Monad (void)
 import Control.Monad.Catch (MonadThrow)
@@ -383,11 +383,13 @@ monerodLog = do
   o <- monerodLogOrigin
   void $ char '\t'
   let syncProgress = do
+        void $ string "\ESC[1;33m"
         (h,po) <- monerodHostPolarity
         void $ string "  Synced "
         soFar <- decimal
         void $ char '/'
         total <- decimal
+        void $ string "\ESC[0m"
         pure SyncProgress
           { syncProgressAmount = soFar
           , syncProgressTotal = total
@@ -418,5 +420,5 @@ monerodLog = do
       other = MoneroDOther <$> takeWhile1 (/= '\n')
   syncProgress <|> syncNewTopBlock <|> other
 
-parseLogStream :: MonadApp stM m => TimeZone -> Producer m BS.ByteString -> m (Vector (WithTimestamp MoneroDLog))
-parseLogStream tz x = x =$= B.lines =$= decode utf8 $$ sinkParser (manyV (withTimestamp tz monerodLog))
+parseLogStream :: MonadApp stM m => TimeZone -> Producer m BS.ByteString -> m (Either ParseError [WithTimestamp MoneroDLog])
+parseLogStream tz x = x =$= decode utf8 $$ sinkParserEither (many (withTimestamp tz monerodLog))

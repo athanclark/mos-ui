@@ -22,6 +22,7 @@ import System.INotify (initINotify)
 data ArgsImpl = ArgsImpl
   { argsImplMoneroDLogFile :: FilePath
   , argsImplMoneroDConfigFile :: FilePath
+  , argsImplMoneroDService :: String
   }
 
 
@@ -29,6 +30,7 @@ args :: String -> Parser ArgsImpl
 args username
   =  ArgsImpl <$> strOption moneroDLog
               <*> strOption moneroDConfig
+              <*> strOption moneroDService
   where
     moneroDLog
       =  long "monerod-log-file"
@@ -40,11 +42,17 @@ args username
       <> value ("/home/" ++ username ++ "/.bitmonero/bitmonero.conf")
       <> help "Absolute path to the monerod config file."
       <> showDefault
+    moneroDService
+      =  long "monerod-service"
+      <> value "monerod.service"
+      <> help "Name of the installed systemd service for monerod."
+      <> showDefault
 
 
 data Args = Args
   { argsMoneroDLogFile :: Path Abs File
   , argsMoneroDConfigFile :: Path Abs File
+  , argsMoneroDService :: String
   }
 
 data ArgsException
@@ -55,7 +63,10 @@ data ArgsException
 instance Exception ArgsException
 
 getArgs :: ArgsImpl -> IO Args
-getArgs ArgsImpl{argsImplMoneroDLogFile,argsImplMoneroDConfigFile} = do
+getArgs ArgsImpl{ argsImplMoneroDLogFile
+                , argsImplMoneroDConfigFile
+                , argsImplMoneroDService
+                } = do
   argsMoneroDLogFile <- case parseOnly absFilePath (T.pack argsImplMoneroDLogFile) of
     Left e -> throw (MoneroDLogFileParseFailure e)
     Right x -> pure x
@@ -65,16 +76,21 @@ getArgs ArgsImpl{argsImplMoneroDLogFile,argsImplMoneroDConfigFile} = do
   pure Args
     { argsMoneroDLogFile
     , argsMoneroDConfigFile
+    , argsMoneroDService = argsImplMoneroDService
     }
 
 
 mkEnv :: Args -> IO Env
-mkEnv Args{argsMoneroDLogFile,argsMoneroDConfigFile} = do
+mkEnv Args{ argsMoneroDLogFile
+          , argsMoneroDConfigFile
+          , argsMoneroDService
+          } = do
   envClient <- connectSession
   envINotify <- initINotify
   pure Env
     { envClient
     , envMoneroDLogFile = argsMoneroDLogFile
     , envMoneroDConfigFile = argsMoneroDConfigFile
+    , envMoneroDService = argsMoneroDService
     , envINotify
     }
