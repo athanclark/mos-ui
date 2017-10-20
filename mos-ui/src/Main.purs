@@ -41,7 +41,7 @@ main = do
     , height: 768
     , devTools: development
     , whenLoaded: \{send} ->
-        onQueue signalQueue \x -> do
-          log "got signal"
+        onQueue signalQueue \x ->
           send {channel: signalOutput, message: encodeJson x}
+          -- FIXME rip out
     }

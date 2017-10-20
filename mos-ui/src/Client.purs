@@ -8,7 +8,8 @@ import Types.DBus (ControlInput, ControlOutput, AllInputs (..), SignalOutput)
 import Prelude
 import Data.Either (Either (..))
 import Data.Maybe (Maybe (..))
-import Data.Argonaut (Json, decodeJson, encodeJson)
+import Data.Argonaut (Json, decodeJson, encodeJson, jsonParser, fromArray)
+import Data.Traversable (traverse)
 import Control.Monad.Reader.Class (ask)
 import Control.Monad.Aff (runAff_)
 import Control.Monad.Eff (Eff)
@@ -22,6 +23,7 @@ import Electron.Main (registerAsyncHandler)
 import Node.Process (PROCESS)
 import Queue (putQueue)
 import Signal.Channel (CHANNEL)
+import Unsafe.Coerce (unsafeCoerce)
 
 
 
@@ -51,10 +53,27 @@ monerodoClient = do
                   , message: encodeJson r
                   }
     }
-  liftEff $ do
-    case getService client monerodoBus of
-      Nothing -> throwException $ error "Couldn't find monerodo bus"
-      Just s -> do
-        let resolve (Left e)  = throwException e
-            resolve (Right i) = on i monerodoSignalMethod (putQueue signalQueue)
-        runAff_ resolve (getInterface s monerodoObject monerodoControl)
+  liftEff $ registerAsyncHandler
+    { channel: signalOutput
+    , handle: \{message,send} -> case decodeJson message of
+        Left e -> warn $ "couldn't decode electron message: " <> show e
+        Right (x :: Unit) ->
+          let resolve (Left e) = throwException e
+              resolve _        = pure unit
+          in  runAff_ resolve $ do
+                (r :: Array String) <- call client monerodoBus monerodoObject monerodoControl monerodoSignalMethod nil
+                case traverse jsonParser r of
+                  Left e -> liftEff $ warn e
+                  Right rs ->
+                    liftEff $ send
+                      { channel: signalOutput
+                      , message: fromArray rs
+                      }
+    }
+  -- liftEff $ do
+  --   case getService client monerodoBus of
+  --     Nothing -> throwException $ error "Couldn't find monerodo bus"
+  --     Just s -> do
+  --       let resolve (Left e)  = throwException e
+  --           resolve (Right i) = on i monerodoSignalMethod (putQueue signalQueue)
+  --       runAff_ resolve (getInterface s monerodoObject monerodoControl)

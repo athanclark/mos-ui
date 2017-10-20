@@ -2,7 +2,7 @@ module Spec where
 
 import Spec.Page.MoneroD as MoneroD
 import Spec.Page.XmrStak as XmrStak
-import Types.DBus (ControlInput (..), ControlOutput (..), AllInputs (..))
+import Types.DBus (ControlInput (..), ControlOutput (..), AllInputs (..), SignalOutput)
 import Client.Constants (controlInput, controlOutput, signalOutput)
 
 import Prelude
@@ -14,6 +14,7 @@ import Data.Time.Duration (Milliseconds (..))
 import Data.Lens (Lens', lens, Prism', prism', (^.))
 import Data.Lens.Record (prop)
 import Data.Symbol (SProxy (..))
+import Control.Monad.Rec.Class (forever)
 import Control.Monad.Aff (runAff_, delay)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Uncurried (mkEffFn1)
@@ -191,8 +192,9 @@ main = do
     { channel: signalOutput
     , handle: \{message} -> do
         case decodeJson message of
-          Left e -> warn $ "Couldn't decode electron ipc signal: " <> show e
-          Right x -> putQueue signalQueue (IpcAction (SignalOutput x))
+          Left e -> warn $ "Couldn't decode electron ipc signal: " <> show e <> ", " <> show message
+          Right (xs :: Array SignalOutput) -> do
+            traverse_ (\x -> putQueue signalQueue (IpcAction (SignalOutput x))) xs
     }
 
   let props = unit
@@ -207,3 +209,12 @@ main = do
       component = R.createClass reactSpec'
 
   traverse_ (render (R.createFactory component props) <<< htmlElementToElement) =<< body =<< document window'
+
+  let resolve (Left e) = warn (show e)
+      resolve _ = pure unit
+  runAff_ resolve $ forever $ do
+    liftEff $ send
+      { channel: signalOutput
+      , message: encodeJson unit
+      }
+    delay (Milliseconds 100.0)

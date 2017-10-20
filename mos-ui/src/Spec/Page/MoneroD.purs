@@ -8,9 +8,13 @@ import MaterialUI.Typography (typography)
 import MaterialUI.Divider (divider)
 
 
-type State = Unit
+type State =
+  { syncHeight :: Maybe (Tuple Int Int)
+  }
 
-initialState = unit
+initialState =
+  { syncHeight: Nothing
+  }
 
 type Action = Unit
 

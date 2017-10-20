@@ -4,6 +4,7 @@ import Prelude
 import Data.Either (Either (..))
 import Data.URI.Authority (Authority, parser)
 import Data.URI.Authority as Auth
+import Data.String as String
 import Data.Argonaut (class EncodeJson, class DecodeJson, encodeJson, decodeJson, (:=), (~>), jsonEmptyObject, (.?))
 import Control.Alternative ((<|>))
 import Text.Parsing.StringParser (runParser)
@@ -31,7 +32,7 @@ data MoneroDLog
 instance encodeJsonMoneroDLog :: EncodeJson MoneroDLog where
   encodeJson (MoneroDOther _) = encodeJson ""
   encodeJson (SyncNewTopBlock {host,polarity,peer,top,current,behind,days})
-    =  "host" := (Auth.print host)
+    =  "host" := (String.drop 2 $ Auth.print host)
     ~> "polarity" := polarity
     ~> "peer" := peer
     ~> "top" := top
@@ -42,7 +43,7 @@ instance encodeJsonMoneroDLog :: EncodeJson MoneroDLog where
   encodeJson (SyncProgress {amount,total,host,peer,polarity})
     =  "amount" := amount
     ~> "total" := total
-    ~> "host" := (Auth.print host)
+    ~> "host" := (String.drop 2 $ Auth.print host)
     ~> "peer" := peer
     ~> "polarity" := polarity
     ~> jsonEmptyObject
@@ -57,7 +58,7 @@ instance decodeJsonMoneroDLog :: DecodeJson MoneroDLog where
         amount <- o' .? "amount"
         total <- o' .? "total"
         host' <- o' .? "host"
-        host <- case runParser parser host' of
+        host <- case runParser parser ("//" <> host') of
           Left e -> Left (show e)
           Right x -> pure x
         peer <- o' .? "peer"
@@ -74,7 +75,7 @@ instance decodeJsonMoneroDLog :: DecodeJson MoneroDLog where
         top <- o' .? "top"
         peer <- o' .? "peer"
         host' <- o' .? "host"
-        host <- case runParser parser host' of
+        host <- case runParser parser ("//" <> host') of
           Left e -> Left (show e)
           Right x -> pure x
         days <- o' .? "days"
