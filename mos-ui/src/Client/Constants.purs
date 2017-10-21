@@ -30,3 +30,6 @@ controlOutput = "ControlOutput"
 
 signalOutput :: String
 signalOutput = "SignalOutput"
+
+envOutput :: String
+envOutput = "EnvOutput"

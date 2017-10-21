@@ -1,8 +1,8 @@
 module Client where
 
-import Client.Constants (monerodoBus, monerodoObject, monerodoControl, monerodoControlMethod, monerodoSignalMethod, controlInput, controlOutput, signalOutput)
+import Client.Constants (monerodoBus, monerodoObject, monerodoControl, monerodoControlMethod, monerodoSignalMethod, controlInput, controlOutput, signalOutput, envOutput)
 import Types (class MonadApp)
-import Types.Env (Env (..))
+import Types.Env (Env (..), toEnvData)
 import Types.DBus (ControlInput, ControlOutput, AllInputs (..), SignalOutput)
 
 import Prelude
@@ -10,13 +10,15 @@ import Data.Either (Either (..))
 import Data.Maybe (Maybe (..))
 import Data.Argonaut (Json, decodeJson, encodeJson, jsonParser, fromArray)
 import Data.Traversable (traverse)
+import Data.Functor.Singleton (liftBaseWith_)
 import Control.Monad.Reader.Class (ask)
 import Control.Monad.Aff (runAff_)
 import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Unsafe (unsafeCoerceEff)
 import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Console (CONSOLE, log, warn)
-import Control.Monad.Eff.Exception (EXCEPTION, error, throwException)
+import Control.Monad.Eff.Exception (EXCEPTION, error, throwException, try)
 import DBus (DBUS, getService, getInterface, call, nil, arg, on)
 import Electron (ELECTRON)
 import Electron.Main (registerAsyncHandler)
@@ -27,7 +29,7 @@ import Unsafe.Coerce (unsafeCoerce)
 
 
 
-monerodoClient :: forall eff m
+monerodoClient :: forall eff stM m
                 . MonadApp ( exception :: EXCEPTION
                            , console   :: CONSOLE
                            , dbus      :: DBUS
@@ -35,7 +37,7 @@ monerodoClient :: forall eff m
                            , process   :: PROCESS
                            , ref       :: REF
                            , channel   :: CHANNEL
-                           | eff) m
+                           | eff) stM m
                => m Unit
 monerodoClient = do
   Env {client,signalQueue} <- ask
@@ -65,10 +67,25 @@ monerodoClient = do
                 case traverse jsonParser r of
                   Left e -> liftEff $ warn e
                   Right rs ->
-                    liftEff $ send
-                      { channel: signalOutput
-                      , message: fromArray rs
-                      }
+                    liftEff $ do
+                      r <- unsafeCoerceEff $ try $ send
+                        { channel: signalOutput
+                        , message: fromArray rs
+                        }
+                      case r of
+                        Left e -> warn $ show e
+                        Right _ -> pure unit
+    }
+  liftBaseWith_ \runInBase -> registerAsyncHandler
+    { channel: envOutput
+    , handle: \{message,send} -> case decodeJson message of
+        Left e -> warn $ "couldn't decode electron message: " <> show e
+        Right (x :: Unit) -> do
+          env <- runInBase ask
+          liftEff $ send
+            { channel: envOutput
+            , message: encodeJson (toEnvData env)
+            }
     }
   -- liftEff $ do
   --   case getService client monerodoBus of

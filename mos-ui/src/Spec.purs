@@ -2,8 +2,10 @@ module Spec where
 
 import Spec.Page.MoneroD as MoneroD
 import Spec.Page.XmrStak as XmrStak
-import Types.DBus (ControlInput (..), ControlOutput (..), AllInputs (..), SignalOutput)
-import Client.Constants (controlInput, controlOutput, signalOutput)
+import Types.Env (EnvData, getEnvData)
+import Types.DBus (Service (..), ControlInput (..), ControlOutput (..), AllInputs (..), SignalOutput)
+import Client.Constants (controlInput, controlOutput, signalOutput, envOutput)
+import System.SystemD.Status (SystemDStatus (..), LoadedState (..))
 
 import Prelude
 import Data.Either (Either (..))
@@ -14,9 +16,11 @@ import Data.Time.Duration (Milliseconds (..))
 import Data.Lens (Lens', lens, Prism', prism', (^.))
 import Data.Lens.Record (prop)
 import Data.Symbol (SProxy (..))
+import Data.Array as Array
 import Control.Monad.Rec.Class (forever)
 import Control.Monad.Aff (runAff_, delay)
 import Control.Monad.Eff (Eff)
+import Control.Monad.Eff.Exception (try)
 import Control.Monad.Eff.Uncurried (mkEffFn1)
 import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Eff.Class (liftEff)
@@ -62,17 +66,24 @@ _XmrStak = prism' XmrStak $ case _ of
   XmrStak x -> Just x
   _         -> Nothing
 
+data PendingPage
+  = MoneroDPage
+  | XmrStakPage
 
 type State =
   { currentPage :: Page
+  , pendingPage :: Maybe PendingPage
+  , env :: EnvData
   }
 
 _currentPage :: Lens' State Page
 _currentPage = lens _.currentPage (_ {currentPage = _})
 
-initialState :: State
-initialState =
-  { currentPage: MoneroD MoneroD.initialState
+initialState :: EnvData -> State
+initialState env =
+  { currentPage: MoneroD (MoneroD.initialState NotFound)
+  , pendingPage: Just MoneroDPage
+  , env
   }
 
 data NavAction
@@ -88,7 +99,7 @@ _MoneroDAction = prism' MoneroDAction $ case _ of
   MoneroDAction x -> Just x
   _               -> Nothing
 
-_XmrStakAction :: Prism' PageAction MoneroD.Action
+_XmrStakAction :: Prism' PageAction XmrStak.Action
 _XmrStakAction = prism' XmrStakAction $ case _ of
   XmrStakAction x -> Just x
   _               -> Nothing
@@ -101,10 +112,11 @@ data Action
 _PageAction :: Prism' Action PageAction
 _PageAction = prism' PageAction $ case _ of
   PageAction p -> Just p
+  IpcAction (SignalOutput o) -> Just (MoneroDAction $ MoneroD.GotSignal o)
   _            -> Nothing
 
 
-spec :: T.Spec _ State _ Action
+spec :: T.Spec _ State Unit Action
 spec = T.simpleSpec ( performAction
                    <> (moneroD ^. T._performAction)
                    <> (xmrStak ^. T._performAction)
@@ -114,11 +126,26 @@ spec = T.simpleSpec ( performAction
     xmrStak = T.focus _currentPage (_PageAction <<< _XmrStakAction) $ T.split _XmrStak XmrStak.spec
 
     performAction action props state = case action of
-      IpcAction i ->
-        liftEff $ log $ "got IPC: " <> show i
       NavAction navAction -> case navAction of
-        ClickedMoneroD -> void $ T.cotransform $ _ {currentPage = MoneroD MoneroD.initialState}
+        ClickedMoneroD -> do
+          liftEff $ send {channel: controlInput, message: encodeJson (GetServiceState $ Just ServiceMoneroD)}
+          void $ T.cotransform $ _ {pendingPage = Just MoneroDPage}
         ClickedXmrStak -> void $ T.cotransform $ _ {currentPage = XmrStak XmrStak.initialState}
+      IpcAction (ControlOutput a@(GotServiceState xs)) -> do
+        case state.pendingPage of
+          Just MoneroDPage -> case Array.head xs of
+            Nothing -> do
+              liftEff $ warn "Empty Service States!"
+              void $ T.cotransform $ _ {pendingPage = Nothing}
+            Just s@(SystemDStatus {name,loadedState})
+              | name == (getEnvData state.env).monerodService -> do
+                  liftEff $ log $ "got monerod service! " <> show s
+                  void $ T.cotransform $ _ { currentPage = MoneroD (MoneroD.initialState loadedState)
+                                           , pendingPage = Nothing
+                                           }
+              | otherwise ->
+                  liftEff $ warn $ "Got service status for non-pending service: " <> show s
+          _ -> pure unit
       _ -> pure unit
 
     render :: T.Render State _ Action
@@ -179,13 +206,15 @@ main = do
   window' <- window
   controlQueue <- newQueue
   signalQueue <- newQueue
+  envQueue <- newQueue
 
   registerAsyncHandler
     { channel: controlOutput
     , handle: \{message} -> do
         case decodeJson message of
           Left e -> warn $ "Couldn't decode electron ipc message: " <> show e
-          Right x -> putQueue controlQueue (IpcAction (ControlOutput x))
+          Right x -> do
+            putQueue controlQueue (IpcAction (ControlOutput x))
     }
 
   registerAsyncHandler
@@ -197,24 +226,44 @@ main = do
             traverse_ (\x -> putQueue signalQueue (IpcAction (SignalOutput x))) xs
     }
 
-  let props = unit
-      {spec: reactSpec, dispatcher} = T.createReactSpec
-        spec initialState
-      reactSpec' = reactSpec
-        { componentDidMount = \this -> do
-            onQueue signalQueue (dispatcher this)
-            onQueue controlQueue (dispatcher this)
-            reactSpec.componentDidMount this
+  registerAsyncHandler
+    { channel: envOutput
+    , handle: \{message} -> do
+        case decodeJson message of
+          Left e -> warn $ "Couldn't decode electron ipc env: " <> show e
+          Right (x :: EnvData) -> do
+            putQueue envQueue x
+    }
+
+  send {channel: envOutput, message: encodeJson unit}
+  onQueue envQueue $ \env -> do
+    r <- try $ do
+
+      let props = unit
+          {spec: reactSpec, dispatcher} = T.createReactSpec
+            spec (initialState env)
+          reactSpec' = reactSpec
+            { componentDidMount = \this -> do
+                onQueue signalQueue (dispatcher this)
+                onQueue controlQueue (dispatcher this)
+                reactSpec.componentDidMount this
+            }
+          component = R.createClass reactSpec'
+
+      traverse_ (render (R.createFactory component props) <<< htmlElementToElement) =<< body =<< document window'
+
+      let resolve (Left e) = warn (show e)
+          resolve _ = pure unit
+      liftEff $ send
+        { channel: controlInput
+        , message: encodeJson $ GetServiceState $ Just ServiceMoneroD
         }
-      component = R.createClass reactSpec'
-
-  traverse_ (render (R.createFactory component props) <<< htmlElementToElement) =<< body =<< document window'
-
-  let resolve (Left e) = warn (show e)
-      resolve _ = pure unit
-  runAff_ resolve $ forever $ do
-    liftEff $ send
-      { channel: signalOutput
-      , message: encodeJson unit
-      }
-    delay (Milliseconds 100.0)
+      runAff_ resolve $ forever $ do
+        liftEff $ do
+          send { channel: signalOutput
+               , message: encodeJson unit
+               }
+        delay (Milliseconds 100.0)
+    case r of
+      Left e -> warn $ show e
+      Right _ -> pure unit

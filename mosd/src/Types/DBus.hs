@@ -5,22 +5,42 @@
 module Types.DBus where
 
 import Monerodo.MoneroD (MoneroDLog)
+import System.SystemD.Status (SystemDStatus)
+
 import Data.Aeson (ToJSON (..), FromJSON (..), Value (..), encode, decode, (.:), (.=), object)
 import Data.Aeson.Types (typeMismatch)
+import qualified Data.Text.Lazy as LT
 import qualified Data.Text.Lazy.Encoding as LT
 import DBus.Internal.Types (IsVariant (..), IsValue (..), Type (TypeString))
 
 
+data Service
+  = ServiceMoneroD
+
+instance ToJSON Service where
+  toJSON ServiceMoneroD = String "monerod"
+
+instance FromJSON Service where
+  parseJSON (String s) | s == "monerod" = pure ServiceMoneroD
+                       | otherwise = fail "not a Service"
+  parseJSON x = typeMismatch "Service" x
+
+instance Show Service where
+  show x = LT.unpack $ LT.decodeUtf8 $ encode x
+
 data ControlInput
-  = Foo
+  = GetServiceState (Maybe Service)
 
 instance FromJSON ControlInput where
-  parseJSON (String s) | s == "foo" = pure Foo
-                       | otherwise  = fail "Not a ControlInput"
+  parseJSON (Object o) = do
+    let parseGetServiceState = GetServiceState <$> o .: "getServiceState"
+    parseGetServiceState
   parseJSON x = typeMismatch "ControlInput" x
 
 instance ToJSON ControlInput where
-  toJSON Foo = String "foo"
+  toJSON (GetServiceState mService) = object
+    [ "getServiceState" .= mService
+    ]
 
 instance IsVariant ControlInput where
   toVariant x = toVariant $ LT.decodeUtf8 $ encode x
@@ -34,14 +54,17 @@ instance IsValue ControlInput where
 
 
 data ControlOutput
-  = Bar
+  = GotServiceState [SystemDStatus]
 
 instance ToJSON ControlOutput where
-  toJSON Bar = String "bar"
+  toJSON (GotServiceState xs) = object
+    [ "gotServiceState" .= xs
+    ]
 
 instance FromJSON ControlOutput where
-  parseJSON (String s) | s == "bar" = pure Bar
-                       | otherwise  = fail "Not a ControlOutput"
+  parseJSON (Object o) = do
+    let gotServiceState = GotServiceState <$> o .: "gotServiceState"
+    gotServiceState
   parseJSON x = typeMismatch "ControlOutput" x
 
 instance IsVariant ControlOutput where

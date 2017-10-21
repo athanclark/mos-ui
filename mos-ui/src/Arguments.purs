@@ -1,11 +1,12 @@
 module Arguments where
 
 import Prelude
-import Node.Yargs.Applicative (runY, flag)
+import Node.Yargs.Applicative (runY, flag, yarg)
 import Node.Yargs.Setup (YargsSetup, usage, help)
 import Unsafe.Coerce (unsafeCoerce)
 import Data.Foldable (fold)
 import Data.Maybe (Maybe (..))
+import Data.Either (Either (..))
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Exception (EXCEPTION)
 import Control.Monad.Eff.Console (CONSOLE)
@@ -19,10 +20,12 @@ argsSetup = fold
 
 newtype Args = Args
   { development :: Boolean
+  , monerodService :: String
   }
 
-arg :: forall eff. Boolean -> Eff eff Args
-arg development = pure $ Args {development}
+arg :: forall eff. Boolean -> String -> Eff eff Args
+arg development monerodService =
+  pure $ Args {development,monerodService}
 
 
 args :: forall eff
@@ -31,3 +34,4 @@ args :: forall eff
             | eff) Args
 args = runY argsSetup $
   arg <$> flag "d" ["development"] (Just "Open Chrome dev tools")
+      <*> yarg "monerod-service" [] (Just "monerod systemd service name") (Left "monerod.service") false

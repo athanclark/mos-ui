@@ -1,5 +1,7 @@
 {-# LANGUAGE
     OverloadedStrings
+  , RecordWildCards
+  , NamedFieldPuns
   #-}
 
 module System.SystemD.Status where
@@ -9,13 +11,15 @@ import Data.Time (UTCTime, zonedTimeToUTC)
 import Data.Text (Text, replace)
 import Data.Char (isSpace)
 import Data.Conduit ((=$=))
-import Data.Conduit.Attoparsec (conduitParserEither, ParseError)
+import Data.Conduit.Attoparsec (sinkParserEither, ParseError)
 import Data.Conduit.Process (sourceCmdWithConsumer)
 import Data.Conduit.Text (decode, utf8)
 import Data.Conduit.Combinators (print)
 import Data.Attoparsec.Text (Parser, char, string, takeWhile1, endOfLine, skipWhile, parseOnly, (<?>))
 import qualified Data.Attoparsec.Text as A
 import Data.Attoparsec.Time (zonedTime)
+import Data.Aeson (ToJSON (..), FromJSON (..), Value (String, Object), object, (.=), (.:))
+import Data.Aeson.Types (typeMismatch)
 import Control.Monad (void)
 import Control.Applicative ((<|>))
 
@@ -24,6 +28,16 @@ data LoadedState
   = Loaded
   | NotFound
   deriving (Show)
+
+instance ToJSON LoadedState where
+  toJSON Loaded = String "loaded"
+  toJSON NotFound = String "not-found"
+
+instance FromJSON LoadedState where
+  parseJSON (String x) | x == "loaded" = pure Loaded
+                       | x == "not-found" = pure NotFound
+                       | otherwise = fail "not a LoadedState"
+  parseJSON x = typeMismatch "LoadedState" x
 
 loadedState :: Parser (LoadedState, Text)
 loadedState = do
@@ -43,6 +57,16 @@ data ActiveState
   = Inactive
   | Active
   deriving (Show)
+
+instance ToJSON ActiveState where
+  toJSON Inactive = String "inactive"
+  toJSON Active = String "active"
+
+instance FromJSON ActiveState where
+  parseJSON (String x) | x == "inactive" = pure Inactive
+                       | x == "active" = pure Active
+                       | otherwise = fail "not a ActiveState"
+  parseJSON x = typeMismatch "ActiveState" x
 
 activeState :: Parser (ActiveState, Maybe UTCTime)
 activeState = do
@@ -286,6 +310,34 @@ data SystemDStatus = SystemDStatus
   , systemdStatusActiveStateSince :: Maybe UTCTime
   } deriving (Show)
 
+instance ToJSON SystemDStatus where
+  toJSON SystemDStatus{..} = object
+    [ "name" .= systemdStatusName
+    , "description" .= systemdStatusDescription
+    , "loadedState" .= systemdStatusLoadedState
+    , "loadedStateExtra" .= systemdStatusLoadedStateExtra
+    , "activeState" .= systemdStatusActiveState
+    , "activeStateSince" .= systemdStatusActiveStateSince
+    ]
+
+instance FromJSON SystemDStatus where
+  parseJSON (Object o) = do
+    systemdStatusName <- o .: "name"
+    systemdStatusDescription <- o .: "description"
+    systemdStatusLoadedState <- o .: "loadedState"
+    systemdStatusLoadedStateExtra <- o .: "loadedStateExtra"
+    systemdStatusActiveState <- o .: "activeState"
+    systemdStatusActiveStateSince <- o .: "activeStateSince"
+    pure SystemDStatus
+      { systemdStatusName
+      , systemdStatusDescription
+      , systemdStatusLoadedState
+      , systemdStatusLoadedStateExtra
+      , systemdStatusActiveState
+      , systemdStatusActiveStateSince
+      }
+  parseJSON x = typeMismatch "SystemDStatus" x
+
 systemdStatus :: Parser SystemDStatus
 systemdStatus = do
   _ <- string "● " <?> "initial dot"
@@ -305,6 +357,6 @@ systemdStatus = do
     , systemdStatusActiveStateSince = activeStateExtra
     }
 
-getServerStatus :: String -> IO ()
-getServerStatus service =
-  snd <$> sourceCmdWithConsumer ("sudo systemctl status " ++ service) (decode utf8 =$= conduitParserEither systemdStatus =$= print)
+getServiceStatus :: String -> IO (Either ParseError SystemDStatus)
+getServiceStatus service =
+  snd <$> sourceCmdWithConsumer ("systemctl status " ++ service) (decode utf8 =$= sinkParserEither systemdStatus)

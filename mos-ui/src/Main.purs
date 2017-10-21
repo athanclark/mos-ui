@@ -4,7 +4,7 @@ import Arguments (args)
 import Client (monerodoClient)
 import Client.Constants (signalOutput)
 import Types (runAppM)
-import Types.Env (Env (..), mkEnv)
+import Types.Env (Env (..), mkEnv, toEnvData)
 
 import Prelude
 import Data.Argonaut (encodeJson)

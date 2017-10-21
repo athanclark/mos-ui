@@ -1,6 +1,7 @@
 module Types.DBus where
 
 import Monerodo.MoneroD (MoneroDLog)
+import System.SystemD.Status (SystemDStatus)
 
 import Prelude
 import Type.Proxy (Proxy (..))
@@ -30,19 +31,33 @@ instance showAllInputs :: Show AllInputs where
   show = unsafeCoerce
 
 
+data Service
+  = ServiceMoneroD
 
-data ControlInput
-  = Foo
+instance encodeJsonService :: EncodeJson Service where
+  encodeJson ServiceMoneroD = encodeJson "monerod"
 
-instance encodeJsonControlInput :: EncodeJson ControlInput where
-  encodeJson Foo = encodeJson "foo"
-
-instance decodeJsonControlInput :: DecodeJson ControlInput where
+instance decodeJsonService :: DecodeJson Service where
   decodeJson json = do
     s <- decodeJson json
     case s of
-      _ | s == "foo" -> pure Foo
-        | otherwise  -> fail "Not a ControlInput"
+      _ | s == "monerod" -> pure ServiceMoneroD
+        | otherwise -> fail "Not a Service"
+
+
+data ControlInput
+  = GetServiceState (Maybe Service)
+
+instance encodeJsonControlInput :: EncodeJson ControlInput where
+  encodeJson (GetServiceState mService)
+    =  "getServiceState" := mService
+    ~> jsonEmptyObject
+
+instance decodeJsonControlInput :: DecodeJson ControlInput where
+  decodeJson json = do
+    o <- decodeJson json
+    let decodeServiceState = GetServiceState <$> o .? "getServiceState"
+    decodeServiceState
 
 instance isVariantControlInput :: IsVariant ControlInput where
   toVariant = toVariant <<< show <<< encodeJson
@@ -57,17 +72,21 @@ instance isValueControlInput :: IsValue ControlInput where
 
 
 data ControlOutput
-  = Bar
+  = GotServiceState (Array SystemDStatus)
 
 instance encodeJsonControlOutput :: EncodeJson ControlOutput where
-  encodeJson Bar = encodeJson "bar"
+  encodeJson (GotServiceState xs)
+    =  "gotServiceState" := xs
+    ~> jsonEmptyObject
 
 instance decodeJsonControlOutput :: DecodeJson ControlOutput where
   decodeJson json = do
-    s <- decodeJson json
-    case s of
-      _ | s == "bar" -> pure Bar
-        | otherwise  -> fail "Not a ControlOutput"
+    o <- decodeJson json
+    let decodeServiceState = GotServiceState <$> o .? "gotServiceState"
+    decodeServiceState
+
+instance showControlOutput :: Show ControlOutput where
+  show x = show (encodeJson x)
 
 instance isVariantControlOutput :: IsVariant ControlOutput where
   toVariant = toVariant <<< show <<< encodeJson
