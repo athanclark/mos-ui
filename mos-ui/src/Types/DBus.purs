@@ -63,9 +63,7 @@ instance isVariantControlInput :: IsVariant ControlInput where
   toVariant = toVariant <<< show <<< encodeJson
   fromVariant v = do
     s <- fromVariant v
-    case jsonParser s >>= decodeJson of
-      Left _ -> Nothing
-      Right x -> pure x
+    jsonParser s >>= decodeJson
 
 instance isValueControlInput :: IsValue ControlInput where
   typeOf Proxy = typeOf (Proxy :: Proxy String)
@@ -92,9 +90,7 @@ instance isVariantControlOutput :: IsVariant ControlOutput where
   toVariant = toVariant <<< show <<< encodeJson
   fromVariant v = do
     s <- fromVariant v
-    case jsonParser s >>= decodeJson of
-      Left _ -> Nothing
-      Right x -> pure x
+    jsonParser s >>= decodeJson
 
 instance isValueControlOutput :: IsValue ControlOutput where
   typeOf Proxy = typeOf (Proxy :: Proxy String)
@@ -115,9 +111,7 @@ instance isVariantSignalOutput :: IsVariant SignalOutput where
   toVariant = toVariant <<< show <<< encodeJson
   fromVariant v = do
     s <- fromVariant v
-    case jsonParser s >>= decodeJson of
-      Left _ -> Nothing
-      Right x -> pure x
+    jsonParser s >>= decodeJson
 
 instance isValueSignalOutput :: IsValue SignalOutput where
   typeOf Proxy = typeOf (Proxy :: Proxy String)

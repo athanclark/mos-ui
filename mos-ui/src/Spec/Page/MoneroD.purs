@@ -15,6 +15,11 @@ import MaterialUI.Typography (typography)
 import MaterialUI.Divider (divider)
 import MaterialUI.LinearProgress (linearProgress)
 import MaterialUI.LinearProgress as LinearProgress
+import MaterialUI.Chip (chip)
+import MaterialUI.Avatar (avatar)
+import MaterialUI.Icons.Brightness3 (brightness3Icon)
+import MaterialUI.Icons.ErrorOutline (errorOutlineIcon)
+import MaterialUI.Icons.CheckCircle (checkCircleIcon)
 
 
 type State =
@@ -52,26 +57,8 @@ spec = T.simpleSpec performAction render
         { "type": Typography.display1
         } [R.text "Status"]
       , divider {}
-      , linearProgress
-          { mode: LinearProgress.determinate
-          , value: case state.syncHeight of
-                      Nothing -> 0.0
-                      Just (Tuple n d) -> (toNumber n / toNumber d) * 100.0
-          }
-      , typography
-        { "type": Typography.body1
-        } [R.em [] [ R.text $ case state.systemdStatus of
-                        Nothing -> "not connected to mosd"
-                        Just (SystemDStatus {loadedState,activeState}) -> case activeState of
-                          Failed -> "failed"
-                          Inactive -> "inactive"
-                          Active -> case state.syncHeight of
-                            Nothing -> case loadedState of
-                              Loaded -> "loaded"
-                              NotFound -> "not found"
-                            Just (Tuple current all) -> show current <> " / " <> show all
-                   ]]
-      , typography
+      ] <> status <>
+      [ typography
         { "type": Typography.display1
         } [R.text "Config"]
       , divider {}
@@ -79,3 +66,34 @@ spec = T.simpleSpec performAction render
         { "type": Typography.body1
         } [R.em [] [R.text "TODO"]]
       ]
+      where
+        status = case state.systemdStatus of
+          Nothing -> [ chip { label: R.text "not connected to mosd"
+                            , avatar: avatar {} [errorOutlineIcon]
+                            }
+                     ]
+          Just (SystemDStatus {loadedState,activeState}) -> case activeState of
+            Failed -> [ chip { avatar: avatar {} [errorOutlineIcon]
+                             , label: R.text "failed"
+                             }
+                      ]
+            Inactive -> [ chip { avatar: avatar {} [brightness3Icon]
+                               , label: R.text "inactive"
+                               }
+                        ]
+            Active -> case state.syncHeight of
+              Nothing -> [ linearProgress {mode: LinearProgress.determinate, value: 0.0}
+                         , chip { avatar: avatar {} [checkCircleIcon]
+                                , label: R.text "running"
+                                }
+                         ]
+              Just (Tuple current all) ->
+                [ linearProgress
+                    { mode: LinearProgress.determinate
+                    , value: (toNumber current / toNumber all) * 100.0
+                    }
+                , chip { avatar: avatar {} [checkCircleIcon]
+                       , label: R.text $ "Sync Height: " <> show current <> " / " <> show all
+                       }
+                ]
+        mkBody x = typography {"type": Typography.body1} x

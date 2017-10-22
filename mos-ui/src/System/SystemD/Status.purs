@@ -50,7 +50,7 @@ newtype SystemDStatus = SystemDStatus
   , loadedState :: LoadedState
   , loadedStateExtra :: String
   , activeState :: ActiveState
-  , activeStateSince :: DateTime
+  , activeStateSince :: Maybe DateTime
   }
 
 instance showSystemDStatus :: Show SystemDStatus where
@@ -63,7 +63,7 @@ instance encodeJsonSystemDStatus :: EncodeJson SystemDStatus where
     ~> "loadedState" := loadedState
     ~> "loadedStateExtra" := loadedStateExtra
     ~> "activeState" := activeState
-    ~> "activeStateSince" := unsafePerformEff (JSDate.toISOString $ JSDate.fromDateTime activeStateSince)
+    ~> "activeStateSince" := ((\x -> unsafePerformEff $ JSDate.toISOString $ JSDate.fromDateTime x) <$> activeStateSince)
     ~> jsonEmptyObject
 
 instance decodeJsonSystemDStatus :: DecodeJson SystemDStatus where
@@ -75,8 +75,12 @@ instance decodeJsonSystemDStatus :: DecodeJson SystemDStatus where
     loadedStateExtra <- o .? "loadedStateExtra"
     activeState <- o .? "activeState"
     activeStateSince' <- o .? "activeStateSince"
-    case JSDate.toDateTime $ unsafePerformEff (JSDate.parse activeStateSince') of
-      Nothing -> fail "couldn't parse iso8601"
-      Just activeStateSince ->
-        pure $ SystemDStatus
-          {name,description,loadedState,loadedStateExtra,activeState,activeStateSince}
+    case activeStateSince' of
+      Nothing -> pure $ SystemDStatus
+                   {name,description,loadedState,loadedStateExtra,activeState,activeStateSince: Nothing}
+      Just activeStateSince'' ->
+        case JSDate.toDateTime $ unsafePerformEff $ JSDate.parse $ activeStateSince'' of
+          Nothing -> fail "couldn't parse iso8601"
+          Just t ->
+            pure $ SystemDStatus
+              {name,description,loadedState,loadedStateExtra,activeState,activeStateSince: Just t}
