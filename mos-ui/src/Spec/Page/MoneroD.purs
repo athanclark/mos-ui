@@ -1,6 +1,6 @@
 module Spec.Page.MoneroD where
 
-import System.SystemD.Status (LoadedState (..))
+import System.SystemD.Status (SystemDStatus (..), ActiveState (..), LoadedState (..))
 import Types.DBus (SignalOutput (..))
 import Monerodo.MoneroD (MoneroDLog (..))
 
@@ -19,17 +19,18 @@ import MaterialUI.LinearProgress as LinearProgress
 
 type State =
   { syncHeight :: Maybe (Tuple Int Int)
-  , loadedState :: LoadedState
+  , systemdStatus :: Maybe (SystemDStatus)
   }
 
-initialState :: LoadedState -> State
-initialState loadedState =
+initialState :: State
+initialState =
   { syncHeight: Nothing
-  , loadedState
+  , systemdStatus: Nothing
   }
 
 data Action
   = GotSignal SignalOutput
+  | GotStatus SystemDStatus
 
 spec :: T.Spec _ State Unit Action
 spec = T.simpleSpec performAction render
@@ -39,6 +40,7 @@ spec = T.simpleSpec performAction render
         SyncProgress {amount,total} -> void $ T.cotransform _ { syncHeight = Just (Tuple amount total) }
         SyncNewTopBlock {current,top} -> void $ T.cotransform _ { syncHeight = Just (Tuple current top) }
         _ -> pure unit
+      GotStatus s -> void $ T.cotransform _ { systemdStatus = Just s }
 
 
     render :: T.Render State _ Action
@@ -54,15 +56,20 @@ spec = T.simpleSpec performAction render
           { mode: LinearProgress.determinate
           , value: case state.syncHeight of
                       Nothing -> 0.0
-                      Just (Tuple n d) -> toNumber (n / d)
+                      Just (Tuple n d) -> (toNumber n / toNumber d) * 100.0
           }
       , typography
         { "type": Typography.body1
-        } [R.em [] [ R.text $ case state.syncHeight of
-                        Nothing -> case state.loadedState of
-                          Loaded -> "running but not syncing"
-                          NotFound -> "not found"
-                        Just (Tuple current all) -> show current <> " / " <> show all
+        } [R.em [] [ R.text $ case state.systemdStatus of
+                        Nothing -> "not connected to mosd"
+                        Just (SystemDStatus {loadedState,activeState}) -> case activeState of
+                          Failed -> "failed"
+                          Inactive -> "inactive"
+                          Active -> case state.syncHeight of
+                            Nothing -> case loadedState of
+                              Loaded -> "loaded"
+                              NotFound -> "not found"
+                            Just (Tuple current all) -> show current <> " / " <> show all
                    ]]
       , typography
         { "type": Typography.display1

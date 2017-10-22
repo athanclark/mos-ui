@@ -26,10 +26,12 @@ instance decodeJsonLoadedState :: DecodeJson LoadedState where
 
 data ActiveState
   = Active
+  | Failed
   | Inactive
 
 instance encodeJsonActiveState :: EncodeJson ActiveState where
   encodeJson Active = encodeJson "active"
+  encodeJson Failed = encodeJson "failed"
   encodeJson Inactive = encodeJson "inactive"
 
 instance decodeJsonActiveState :: DecodeJson ActiveState where
@@ -37,6 +39,7 @@ instance decodeJsonActiveState :: DecodeJson ActiveState where
     s <- decodeJson json
     case s of
       _ | s == "active" -> pure Active
+        | s == "failed" -> pure Failed
         | s == "inactive" -> pure Inactive
         | otherwise -> fail "Not a ActiveState"
 

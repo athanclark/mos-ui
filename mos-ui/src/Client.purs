@@ -12,13 +12,13 @@ import Data.Argonaut (Json, decodeJson, encodeJson, jsonParser, fromArray)
 import Data.Traversable (traverse)
 import Data.Functor.Singleton (liftBaseWith_)
 import Control.Monad.Reader.Class (ask)
-import Control.Monad.Aff (runAff_)
+import Control.Monad.Aff (runAff_, attempt)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Unsafe (unsafeCoerceEff)
 import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Console (CONSOLE, log, warn)
-import Control.Monad.Eff.Exception (EXCEPTION, error, throwException, try)
+import Control.Monad.Eff.Exception (EXCEPTION, Error, error, throwException, try)
 import DBus (DBUS, getService, getInterface, call, nil, arg, on)
 import Electron (ELECTRON)
 import Electron.Main (registerAsyncHandler)
@@ -49,11 +49,14 @@ monerodoClient = do
           let resolve (Left e) = throwException e
               resolve _        = pure unit
           in  runAff_ resolve $ do
-                (r :: ControlOutput) <- call client monerodoBus monerodoObject monerodoControl monerodoControlMethod (nil `arg` x)
-                liftEff $ send
-                  { channel: controlOutput
-                  , message: encodeJson r
-                  }
+                (eR :: Either Error ControlOutput) <- attempt $ call client monerodoBus monerodoObject monerodoControl monerodoControlMethod (nil `arg` x)
+                case eR of
+                  Left e -> liftEff $ warn $ show e
+                  Right r ->
+                    liftEff $ send
+                      { channel: controlOutput
+                      , message: encodeJson r
+                      }
     }
   liftEff $ registerAsyncHandler
     { channel: signalOutput
@@ -63,18 +66,21 @@ monerodoClient = do
           let resolve (Left e) = throwException e
               resolve _        = pure unit
           in  runAff_ resolve $ do
-                (r :: Array String) <- call client monerodoBus monerodoObject monerodoControl monerodoSignalMethod nil
-                case traverse jsonParser r of
-                  Left e -> liftEff $ warn e
-                  Right rs ->
-                    liftEff $ do
-                      r <- unsafeCoerceEff $ try $ send
-                        { channel: signalOutput
-                        , message: fromArray rs
-                        }
-                      case r of
-                        Left e -> warn $ show e
-                        Right _ -> pure unit
+                (eR :: Either Error (Array String)) <- attempt $ call client monerodoBus monerodoObject monerodoControl monerodoSignalMethod nil
+                case eR of
+                  Left e -> liftEff $ warn $ show e
+                  Right r ->
+                    case traverse jsonParser r of
+                      Left e -> liftEff $ warn e
+                      Right rs ->
+                        liftEff $ do
+                          r <- unsafeCoerceEff $ try $ send
+                            { channel: signalOutput
+                            , message: fromArray rs
+                            }
+                          case r of
+                            Left e -> warn $ show e
+                            Right _ -> pure unit
     }
   liftBaseWith_ \runInBase -> registerAsyncHandler
     { channel: envOutput

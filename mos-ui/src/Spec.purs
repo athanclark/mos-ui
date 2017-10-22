@@ -5,11 +5,12 @@ import Spec.Page.XmrStak as XmrStak
 import Types.Env (EnvData, getEnvData)
 import Types.DBus (Service (..), ControlInput (..), ControlOutput (..), AllInputs (..), SignalOutput)
 import Client.Constants (controlInput, controlOutput, signalOutput, envOutput)
-import System.SystemD.Status (SystemDStatus (..), LoadedState (..))
+import System.SystemD.Status (SystemDStatus (..), LoadedState (..), ActiveState (..))
 
 import Prelude
 import Data.Either (Either (..))
 import Data.Maybe (Maybe (..))
+import Data.Tuple (Tuple (..))
 import Data.Argonaut (encodeJson, decodeJson)
 import Data.Traversable (traverse_)
 import Data.Time.Duration (Milliseconds (..))
@@ -18,7 +19,7 @@ import Data.Lens.Record (prop)
 import Data.Symbol (SProxy (..))
 import Data.Array as Array
 import Control.Monad.Rec.Class (forever)
-import Control.Monad.Aff (runAff_, delay)
+import Control.Monad.Aff (runAff_, delay, sequential, parallel)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Exception (try)
 import Control.Monad.Eff.Uncurried (mkEffFn1)
@@ -81,7 +82,7 @@ _currentPage = lens _.currentPage (_ {currentPage = _})
 
 initialState :: EnvData -> State
 initialState env =
-  { currentPage: MoneroD (MoneroD.initialState NotFound)
+  { currentPage: MoneroD MoneroD.initialState
   , pendingPage: Just MoneroDPage
   , env
   }
@@ -132,20 +133,19 @@ spec = T.simpleSpec ( performAction
           void $ T.cotransform $ _ {pendingPage = Just MoneroDPage}
         ClickedXmrStak -> void $ T.cotransform $ _ {currentPage = XmrStak XmrStak.initialState}
       IpcAction (ControlOutput a@(GotServiceState xs)) -> do
-        case state.pendingPage of
-          Just MoneroDPage -> case Array.head xs of
-            Nothing -> do
-              liftEff $ warn "Empty Service States!"
-              void $ T.cotransform $ _ {pendingPage = Nothing}
-            Just s@(SystemDStatus {name,loadedState})
-              | name == (getEnvData state.env).monerodService -> do
-                  liftEff $ log $ "got monerod service! " <> show s
-                  void $ T.cotransform $ _ { currentPage = MoneroD (MoneroD.initialState loadedState)
-                                           , pendingPage = Nothing
-                                           }
-              | otherwise ->
-                  liftEff $ warn $ "Got service status for non-pending service: " <> show s
-          _ -> pure unit
+        case Array.head xs of
+          Nothing -> do
+            liftEff $ warn "Empty Service States!"
+            void $ T.cotransform $ _ {pendingPage = Nothing}
+          Just s@(SystemDStatus {name,loadedState,activeState})
+            | name == (getEnvData state.env).monerodService -> do
+                liftEff $ log $ "got monerod service! " <> show s
+                case state.pendingPage of
+                  Just MoneroDPage -> void $ T.cotransform _ {pendingPage = Nothing}
+                  _ -> pure unit
+                (moneroD ^. T._performAction) (PageAction $ MoneroDAction $ MoneroD.GotStatus s) props state
+            | otherwise ->
+                liftEff $ warn $ "Got service status for non-pending service: " <> show s
       _ -> pure unit
 
     render :: T.Render State _ Action
@@ -253,17 +253,22 @@ main = do
       traverse_ (render (R.createFactory component props) <<< htmlElementToElement) =<< body =<< document window'
 
       let resolve (Left e) = warn (show e)
-          resolve _ = pure unit
-      liftEff $ send
-        { channel: controlInput
-        , message: encodeJson $ GetServiceState $ Just ServiceMoneroD
-        }
-      runAff_ resolve $ forever $ do
-        liftEff $ do
-          send { channel: signalOutput
-               , message: encodeJson unit
-               }
-        delay (Milliseconds 100.0)
+          resolve (Right (Tuple _ _)) = pure unit
+      runAff_ resolve $ sequential $
+        Tuple <$> parallel (forever $ do
+                    liftEff $ do
+                      send  { channel: signalOutput
+                            , message: encodeJson unit
+                            }
+                    delay (Milliseconds 300.0)
+                  )
+              <*> parallel (forever $ do
+                    liftEff $ do
+                      send  { channel: controlInput
+                            , message: encodeJson $ GetServiceState $ Just ServiceMoneroD
+                            }
+                    delay (Milliseconds 1000.0)
+                  )
     case r of
       Left e -> warn $ show e
       Right _ -> pure unit

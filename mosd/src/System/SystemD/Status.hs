@@ -55,16 +55,19 @@ loadedStateTest = "   Loaded: loaded (/lib/systemd/system/wpa_supplicant.service
 
 data ActiveState
   = Inactive
+  | Failed
   | Active
   deriving (Show)
 
 instance ToJSON ActiveState where
   toJSON Inactive = String "inactive"
   toJSON Active = String "active"
+  toJSON Failed = String "failed"
 
 instance FromJSON ActiveState where
   parseJSON (String x) | x == "inactive" = pure Inactive
                        | x == "active" = pure Active
+                       | x == "failed" = pure Failed
                        | otherwise = fail "not a ActiveState"
   parseJSON x = typeMismatch "ActiveState" x
 
@@ -81,10 +84,20 @@ activeState = do
           Left e -> fail e
           Right time ->
             pure (Active, Just (zonedTimeToUTC time))
+      failed = do
+        _ <- string "failed (Result: exit-code) " <?> "actually failed"
+        _ <- string "since "
+        _ <- A.take 4
+        r <- takeWhile1 (/= ';')
+        _ <- takeWhile1 (/= '\n')
+        case parseOnly zonedTime (replaceTZ r) of
+          Left e -> fail e
+          Right time ->
+            pure (Failed, Just (zonedTimeToUTC time))
       inactive = do
         _ <- string "inactive (dead)\n" <?> "actually inactive"
         pure (Inactive, Nothing)
-  active <|> inactive
+  active <|> failed <|> inactive
   where
     replaceTZ x = foldr (\(k,v) acc -> replace k v acc) x timezones
     timezones =

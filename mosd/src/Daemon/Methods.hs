@@ -38,7 +38,7 @@ control (GetServiceState mService) = do
         pure envMoneroDService
     eStatus <- liftIO $ getServiceStatus serviceName
     case eStatus of
-      Left e -> throwM e
+      Left e -> log' (T.pack $ show e) >> throwM e
       Right x -> pure x
   log' $ "Service states: " <> T.pack (show xs)
   pure (GotServiceState xs)
