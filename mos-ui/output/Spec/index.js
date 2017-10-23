@@ -263,6 +263,7 @@ var spec = (function () {
                                     };
                                 };
                                 $59.pendingPage = new Data_Maybe.Just(MoneroDPage.value);
+                                $59.currentPage = new MoneroD(Spec_Page_MoneroD.initialState);
                                 return $59;
                             }));
                         });

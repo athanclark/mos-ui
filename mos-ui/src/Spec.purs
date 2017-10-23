@@ -130,7 +130,7 @@ spec = T.simpleSpec ( performAction
       NavAction navAction -> case navAction of
         ClickedMoneroD -> do
           liftEff $ send {channel: controlInput, message: encodeJson (GetServiceState $ Just ServiceMoneroD)}
-          void $ T.cotransform $ _ {pendingPage = Just MoneroDPage}
+          void $ T.cotransform $ _ {pendingPage = Just MoneroDPage, currentPage = MoneroD MoneroD.initialState}
         ClickedXmrStak -> void $ T.cotransform $ _ {currentPage = XmrStak XmrStak.initialState}
       IpcAction (ControlOutput a@(GotServiceState xs)) -> do
         case Array.head xs of
