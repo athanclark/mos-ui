@@ -4,6 +4,7 @@
   , RecordWildCards
   , Rank2Types
   , FlexibleContexts
+  , TemplateHaskell
   #-}
 
 module Monerodo.MoneroD where
@@ -27,17 +28,23 @@ import Data.Time (UTCTime)
 import Data.Time.LocalTime (TimeZone, localTimeToUTC)
 import Data.Vector (Vector)
 import Data.Aeson (ToJSON (..), FromJSON (..), (.:), (.=), object, Value (Object, String))
+import Data.Maybe (fromMaybe)
 import Data.Aeson.Types (typeMismatch)
+import Data.Default (Default, def)
 import Control.Applicative (optional, (<|>), many)
 import Control.Alternative.Vector (manyV)
 import Control.Monad (void)
 import Control.Monad.Catch (MonadThrow)
 import Control.Monad.Trans.Resource (MonadResource)
 import Text.Read (readMaybe)
-import Path (Path, Abs, File, toFilePath)
+import Path (Path, Abs, Rel, File, Dir, toFilePath, parseRelDir, mkAbsDir, mkRelFile, (</>))
 import Net.Types (IPv4, IPv6)
+import Net.IPv4 (fromOctets)
 import qualified Net.IPv4.Text as IPv4
 import qualified Net.IPv6.Text as IPv6
+import Language.Haskell.TH (runIO, stringE)
+import Unsafe.Coerce (unsafeCoerce)
+import System.Posix.User (getLoginName)
 
 
 instance ToJSON URIAuth where
@@ -59,18 +66,18 @@ data MoneroDConfig
   | BlockSyncSize Int
   | P2pBindPort Int
   | P2pBindIp (Either IPv4 IPv6)
-  | P2pExternalPort Int
+  | P2pExternalPort (Maybe Int)
   | HideMyPort Bool
   | NoIgd Bool
   | Offline Bool
-  | MaxOutPeers Int
-  | LimitRateUp Int
-  | LimitRateDown Int
-  | LimitRate Int
+  | MaxOutPeers (Maybe Int)
+  | LimitRateUp (Maybe Int)
+  | LimitRateDown (Maybe Int)
+  | LimitRate (Maybe Int)
   | RpcBindPort Int
   | RpcBindIp (Either IPv4 IPv6)
   | RestrictedRpc Bool
-  | RpcLogin String (Maybe String)
+  | RpcLogin Text (Maybe Text)
   | ConfirmExternalBind Bool
 
 instance Show MoneroDConfig where
@@ -82,18 +89,18 @@ instance Show MoneroDConfig where
   show (BlockSyncSize x) = "block-sync-size=" ++ show x
   show (P2pBindPort x) = "p2p-bind-port=" ++ show x
   show (P2pBindIp x) = "p2p-bind-ip=" ++ unpack (either IPv4.encode IPv6.encode x)
-  show (P2pExternalPort x) = "p2p-external-port=" ++ show x
+  show (P2pExternalPort x) = "p2p-external-port=" ++ show (fromMaybe 0 x)
   show (HideMyPort x) = "hide-my-port=" ++ show (if x then 1 else 0)
   show (NoIgd x) = "no-igd=" ++ show (if x then 1 else 0)
   show (Offline x) = "offline=" ++ show (if x then 1 else 0)
-  show (MaxOutPeers x) = "out-peers=" ++ show x
-  show (LimitRateUp x) = "limit-rate-up=" ++ show x
-  show (LimitRateDown x) = "limit-rate-down=" ++ show x
-  show (LimitRate x) = "limit-rate=" ++ show x
+  show (MaxOutPeers x) = "out-peers=" ++ show (fromMaybe (-1) x)
+  show (LimitRateUp x) = "limit-rate-up=" ++ show (fromMaybe (-1) x)
+  show (LimitRateDown x) = "limit-rate-down=" ++ show (fromMaybe (-1) x)
+  show (LimitRate x) = "limit-rate=" ++ show (fromMaybe (-1) x)
   show (RpcBindPort x) = "rpc-bind-port=" ++ show x
   show (RpcBindIp x) = "rpc-bind-ip=" ++ unpack (either IPv4.encode IPv6.encode x)
   show (RestrictedRpc x) = "restricted-rpc=" ++ show (if x then 1 else 0)
-  show (RpcLogin u p) = "rpc-login=" ++ u ++ maybe "" (':':) p
+  show (RpcLogin u p) = "rpc-login=" ++ unpack u ++ maybe "" ((':':) . unpack) p
   show (ConfirmExternalBind x) = "confirm-external-bind=" ++ show (if x then 1 else 0)
 
 mkConfig :: [MoneroDConfig] -> String
@@ -150,7 +157,8 @@ configParser
       P2pBindIp <$> eitherP ipv4 ipv6
     parseP2PExternalPort = do
       string "p2p-external-port="
-      P2pExternalPort <$> decimal
+      let none = P2pExternalPort Nothing <$ char '0'
+      none <|> (P2pExternalPort . Just <$> decimal)
     parseHideMyPort = do
       string "hide-my-port="
       (HideMyPort . (/= 0)) <$> decimal
@@ -162,16 +170,20 @@ configParser
       (Offline . (/= 0)) <$> decimal
     parseMaxOutPeers = do
       string "out-peers="
-      MaxOutPeers <$> decimal
+      let none = MaxOutPeers Nothing <$ string "-1"
+      none <|> (MaxOutPeers . Just <$> decimal)
     parseLimitRateUp = do
       string "limit-rate-up="
-      LimitRateUp <$> decimal
+      let none = LimitRateUp Nothing <$ string "-1"
+      none <|> (LimitRateUp . Just <$> decimal)
     parseLimitRateDown = do
       string "limit-rate-down="
-      LimitRateDown <$> decimal
+      let none = LimitRateDown Nothing <$ string "-1"
+      none <|> (LimitRateDown . Just <$> decimal)
     parseLimitRate = do
       string "limit-rate="
-      LimitRate <$> decimal
+      let none = LimitRate Nothing <$ string "-1"
+      none <|> (LimitRate . Just <$> decimal)
     parseRpcBindPort = do
       string "rpc-bind-port="
       RpcBindPort <$> decimal
@@ -183,10 +195,10 @@ configParser
       (RestrictedRpc . (/= 0)) <$> decimal
     parseRpcLogin = do
       string "rpc-login="
-      u <- unpack <$> takeWhile1 (\x -> not (isControl x || isSpace x))
+      u <- takeWhile1 (\x -> not (isControl x || isSpace x))
       mp <- let pass = do
                   void $ char ':'
-                  (Just . unpack) <$> takeWhile1 (\x -> not (isControl x || isSpace x))
+                  Just <$> takeWhile1 (\x -> not (isControl x || isSpace x))
                 bad = pure Nothing
             in  pass <|> bad
       pure (RpcLogin u mp)
@@ -199,6 +211,115 @@ parseConfigStream ::  ( MonadThrow m
                       )
                   => FilePath -> m [MoneroDConfig]
 parseConfigStream f = sourceFile f =$= decode utf8 $$ sinkParser (configParser `sepBy` endOfLine)
+
+
+-- | Oneshot data type in unison, not sparesely
+data MoneroDConfigFile = MoneroDConfigFile
+  { moneroDMaxConcurrency :: Int
+  , moneroDDataDir :: Path Abs File
+  , moneroDEnforceDnsCheckpointing :: Bool
+  , moneroDMaxThreadsPrepBlocks :: Int
+  , moneroDFastBlockSync :: Bool
+  , moneroDBlockSyncSize :: Int
+  , moneroDP2pBindPort :: Int
+  , moneroDP2pBindIp :: Either IPv4 IPv6
+  , moneroDP2pExternalPort :: Maybe Int
+  , moneroDHideMyPort :: Bool
+  , moneroDNoIgd :: Bool
+  , moneroDOffline :: Bool
+  , moneroDMaxOutPeers :: Maybe Int
+  , moneroDLimitRateUp :: Maybe Int
+  , moneroDLimitRateDown :: Maybe Int
+  , moneroDLimitRate :: Maybe Int
+  , moneroDRpcBindPort :: Int
+  , moneroDRpcBindIp :: Either IPv4 IPv6
+  , moneroDRestrictedRpc :: Bool
+  , moneroDRpcLoginName :: Maybe Text
+  , moneroDRpcLoginPassword :: Maybe Text
+  , moneroDConfirmExternalBind :: Bool
+  }
+
+instance Show MoneroDConfigFile where
+  show MoneroDConfigFile{..} = unlines
+    [ show $ MaxConcurrency moneroDMaxConcurrency
+    , show $ DataDir moneroDDataDir
+    , show $ EnforceDnsCheckpointing moneroDEnforceDnsCheckpointing
+    , show $ MaxThreadsPrepBlocks moneroDMaxThreadsPrepBlocks
+    , show $ FastBlockSync moneroDFastBlockSync
+    , show $ BlockSyncSize moneroDBlockSyncSize
+    , show $ P2pBindPort moneroDP2pBindPort
+    , show $ P2pBindIp moneroDP2pBindIp
+    , show $ P2pExternalPort moneroDP2pExternalPort
+    , show $ HideMyPort moneroDHideMyPort
+    , show $ NoIgd moneroDNoIgd
+    , show $ Offline moneroDOffline
+    , show $ MaxOutPeers moneroDMaxOutPeers
+    , show $ LimitRateUp moneroDLimitRateUp
+    , show $ LimitRateDown moneroDLimitRateDown
+    , show $ LimitRate moneroDLimitRate
+    , show $ RpcBindPort moneroDRpcBindPort
+    , show $ RpcBindIp moneroDRpcBindIp
+    , show $ RestrictedRpc moneroDRestrictedRpc
+    , show $ RpcLogin (fromMaybe "" moneroDRpcLoginName) moneroDRpcLoginPassword
+    , show $ ConfirmExternalBind moneroDConfirmExternalBind
+    ]
+
+
+username :: Path Rel Dir
+username = unsafeCoerce $(stringE =<< runIO ((++ "/") <$> getLoginName))
+
+instance Default MoneroDConfigFile where
+  def = MoneroDConfigFile
+    { moneroDMaxConcurrency = 0
+    , moneroDDataDir = $(mkAbsDir "/home") </> username </> $(mkRelFile ".bitmonero")
+    , moneroDEnforceDnsCheckpointing = False
+    , moneroDMaxThreadsPrepBlocks = 4
+    , moneroDFastBlockSync = True
+    , moneroDBlockSyncSize = 0
+    , moneroDP2pBindPort = 18080
+    , moneroDP2pBindIp = Left (fromOctets 0 0 0 0)
+    , moneroDP2pExternalPort = Nothing
+    , moneroDHideMyPort = False
+    , moneroDNoIgd = False
+    , moneroDOffline = False
+    , moneroDMaxOutPeers = Nothing
+    , moneroDLimitRateUp = Nothing
+    , moneroDLimitRateDown = Nothing
+    , moneroDLimitRate = Nothing
+    , moneroDRpcBindPort = 18081
+    , moneroDRpcBindIp = Left (fromOctets 127 0 0 1)
+    , moneroDRestrictedRpc = False
+    , moneroDRpcLoginName = Nothing
+    , moneroDRpcLoginPassword = Nothing
+    , moneroDConfirmExternalBind = False
+    }
+
+fromConfigLines :: [MoneroDConfig] -> MoneroDConfigFile
+fromConfigLines = foldr go def
+  where
+    go a acc = case a of
+      MaxConcurrency x -> acc { moneroDMaxConcurrency = x }
+      DataDir x -> acc { moneroDDataDir = x }
+      EnforceDnsCheckpointing x -> acc { moneroDEnforceDnsCheckpointing = x }
+      MaxThreadsPrepBlocks x -> acc { moneroDMaxThreadsPrepBlocks = x }
+      FastBlockSync x -> acc { moneroDFastBlockSync = x }
+      BlockSyncSize x -> acc { moneroDBlockSyncSize = x }
+      P2pBindPort x -> acc { moneroDP2pBindPort = x }
+      P2pBindIp x -> acc { moneroDP2pBindIp = x }
+      P2pExternalPort x -> acc { moneroDP2pExternalPort = x }
+      HideMyPort x -> acc { moneroDHideMyPort = x }
+      NoIgd x -> acc { moneroDNoIgd = x }
+      Offline x -> acc { moneroDOffline = x }
+      MaxOutPeers x -> acc { moneroDMaxOutPeers = x }
+      LimitRateUp x -> acc { moneroDLimitRateUp = x }
+      LimitRateDown x -> acc { moneroDLimitRateDown = x }
+      LimitRate x -> acc { moneroDLimitRate = x }
+      RpcBindPort x -> acc { moneroDRpcBindPort = x }
+      RpcBindIp x -> acc { moneroDRpcBindIp = x }
+      RestrictedRpc x -> acc { moneroDRestrictedRpc = x }
+      RpcLogin n p -> acc { moneroDRpcLoginName = Just n
+                          , moneroDRpcLoginPassword = p }
+      ConfirmExternalBind x -> acc { moneroDConfirmExternalBind = x }
 
 
 data WithTimestamp a = WithTimestamp

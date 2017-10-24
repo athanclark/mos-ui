@@ -36,6 +36,7 @@ library
                      , conduit-extra
                      , dbus >= 0.10.13
                      , bytestring
+                     , data-default
                      , exceptions
                      , extractable-singleton
                      , follow-file
@@ -48,8 +49,10 @@ library
                      , path
                      , path-extra
                      , resourcet
+                     , template-haskell
                      , text
                      , time
+                     , unix
                      , vector
   default-language:    Haskell2010
   ghc-options:         -Wall

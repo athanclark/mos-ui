@@ -28,8 +28,12 @@ instance FromJSON Service where
 instance Show Service where
   show x = LT.unpack $ LT.decodeUtf8 $ encode x
 
+data AssignConfig
+  = MoneroDConfig 
+
 data ControlInput
   = GetServiceState (Maybe Service)
+  | AssignConfig AssignConfig
 
 instance FromJSON ControlInput where
   parseJSON (Object o) = do
