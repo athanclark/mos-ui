@@ -14,10 +14,13 @@ var Data_Boolean = require("../Data.Boolean");
 var Data_Either = require("../Data.Either");
 var Data_Eq = require("../Data.Eq");
 var Data_Function = require("../Data.Function");
+var Data_Maybe = require("../Data.Maybe");
+var Data_Path_Pathy = require("../Data.Path.Pathy");
 var Data_Semigroup = require("../Data.Semigroup");
 var Data_Show = require("../Data.Show");
 var Data_String = require("../Data.String");
 var Data_URI_Authority = require("../Data.URI.Authority");
+var Data_URI_Host = require("../Data.URI.Host");
 var Prelude = require("../Prelude");
 var Text_Parsing_StringParser = require("../Text.Parsing.StringParser");
 var INC = (function () {
@@ -68,7 +71,7 @@ var encodeJsonSyncPolarity = new Data_Argonaut_Encode_Class.EncodeJson(function 
     if (v instanceof OUT) {
         return Data_Argonaut_Encode_Class.encodeJson(Data_Argonaut_Encode_Class.encodeJsonJString)("OUT");
     };
-    throw new Error("Failed pattern match at Monerodo.MoneroD line 97, column 1 - line 97, column 59: " + [ v.constructor.name ]);
+    throw new Error("Failed pattern match at Monerodo.MoneroD line 101, column 1 - line 101, column 59: " + [ v.constructor.name ]);
 });
 var encodeJsonMoneroDLog = new Data_Argonaut_Encode_Class.EncodeJson(function (v) {
     if (v instanceof MoneroDOther) {
@@ -80,7 +83,7 @@ var encodeJsonMoneroDLog = new Data_Argonaut_Encode_Class.EncodeJson(function (v
     if (v instanceof SyncProgress) {
         return Data_Argonaut_Encode_Combinators.extend(Data_Argonaut_Encode_Class.encodeJsonJson)(Data_Argonaut_Encode_Combinators.assoc(Data_Argonaut_Encode_Class.encodeJsonInt)("amount")(v.value0.amount))(Data_Argonaut_Encode_Combinators.extend(Data_Argonaut_Encode_Class.encodeJsonJson)(Data_Argonaut_Encode_Combinators.assoc(Data_Argonaut_Encode_Class.encodeJsonInt)("total")(v.value0.total))(Data_Argonaut_Encode_Combinators.extend(Data_Argonaut_Encode_Class.encodeJsonJson)(Data_Argonaut_Encode_Combinators.assoc(Data_Argonaut_Encode_Class.encodeJsonJString)("host")(Data_String.drop(2)(Data_URI_Authority.print(v.value0.host))))(Data_Argonaut_Encode_Combinators.extend(Data_Argonaut_Encode_Class.encodeJsonJson)(Data_Argonaut_Encode_Combinators.assoc(Data_Argonaut_Encode_Class.encodeJsonInt)("peer")(v.value0.peer))(Data_Argonaut_Encode_Combinators.extend(Data_Argonaut_Encode_Class.encodeJsonJson)(Data_Argonaut_Encode_Combinators.assoc(encodeJsonSyncPolarity)("polarity")(v.value0.polarity))(Data_Argonaut_Core.jsonEmptyObject)))));
     };
-    throw new Error("Failed pattern match at Monerodo.MoneroD line 32, column 1 - line 32, column 55: " + [ v.constructor.name ]);
+    throw new Error("Failed pattern match at Monerodo.MoneroD line 36, column 1 - line 36, column 55: " + [ v.constructor.name ]);
 });
 var decodeJsonSyncPolarity = new Data_Argonaut_Decode_Class.DecodeJson(function (json) {
     return Control_Bind.bind(Data_Either.bindEither)(Data_Argonaut_Decode_Class.decodeJson(Data_Argonaut_Decode_Class.decodeJsonString)(json))(function (v) {
@@ -93,7 +96,7 @@ var decodeJsonSyncPolarity = new Data_Argonaut_Decode_Class.DecodeJson(function 
         if (Data_Boolean.otherwise) {
             return new Data_Either.Left("Not a SyncPolarity");
         };
-        throw new Error("Failed pattern match at Monerodo.MoneroD line 104, column 5 - line 107, column 29: " + [ v.constructor.name ]);
+        throw new Error("Failed pattern match at Monerodo.MoneroD line 108, column 5 - line 115, column 1: " + [ v.constructor.name ]);
     });
 });
 var decodeJsonMoneroDLog = new Data_Argonaut_Decode_Class.DecodeJson(function (json) {
@@ -110,7 +113,7 @@ var decodeJsonMoneroDLog = new Data_Argonaut_Decode_Class.DecodeJson(function (j
                             if (v4 instanceof Data_Either.Right) {
                                 return Control_Applicative.pure(Data_Either.applicativeEither)(v4.value0);
                             };
-                            throw new Error("Failed pattern match at Monerodo.MoneroD line 61, column 17 - line 63, column 28: " + [ v4.constructor.name ]);
+                            throw new Error("Failed pattern match at Monerodo.MoneroD line 65, column 17 - line 67, column 28: " + [ v4.constructor.name ]);
                         })())(function (v4) {
                             return Control_Bind.bind(Data_Either.bindEither)(Data_Argonaut_Decode_Combinators.getField(Data_Argonaut_Decode_Class.decodeJsonInt)(v)("peer"))(function (v5) {
                                 return Control_Bind.bind(Data_Either.bindEither)(Data_Argonaut_Decode_Combinators.getField(decodeJsonSyncPolarity)(v)("polarity"))(function (v6) {
@@ -142,7 +145,7 @@ var decodeJsonMoneroDLog = new Data_Argonaut_Decode_Class.DecodeJson(function (j
                             if (v4 instanceof Data_Either.Right) {
                                 return Control_Applicative.pure(Data_Either.applicativeEither)(v4.value0);
                             };
-                            throw new Error("Failed pattern match at Monerodo.MoneroD line 78, column 17 - line 80, column 28: " + [ v4.constructor.name ]);
+                            throw new Error("Failed pattern match at Monerodo.MoneroD line 82, column 17 - line 84, column 28: " + [ v4.constructor.name ]);
                         })())(function (v4) {
                             return Control_Bind.bind(Data_Either.bindEither)(Data_Argonaut_Decode_Combinators.getField(Data_Argonaut_Decode_Class.decodeJsonInt)(v)("days"))(function (v5) {
                                 return Control_Bind.bind(Data_Either.bindEither)(Data_Argonaut_Decode_Combinators.getField(Data_Argonaut_Decode_Class.decodeJsonInt)(v)("behind"))(function (v6) {

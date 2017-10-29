@@ -2,10 +2,14 @@ module Monerodo.MoneroD where
 
 import Prelude
 import Data.Either (Either (..))
-import Data.URI.Authority (Authority, parser)
+import Data.Maybe (Maybe (..))
+import Data.URI.Authority (Authority)
 import Data.URI.Authority as Auth
+import Data.URI.Host (Host)
+import Data.URI.Host as Host
 import Data.String as String
 import Data.Argonaut (class EncodeJson, class DecodeJson, encodeJson, decodeJson, (:=), (~>), jsonEmptyObject, (.?))
+import Data.Path.Pathy (Path, Abs, File, Sandboxed)
 import Control.Alternative ((<|>))
 import Text.Parsing.StringParser (runParser)
 
@@ -58,7 +62,7 @@ instance decodeJsonMoneroDLog :: DecodeJson MoneroDLog where
         amount <- o' .? "amount"
         total <- o' .? "total"
         host' <- o' .? "host"
-        host <- case runParser parser ("//" <> host') of
+        host <- case runParser Auth.parser ("//" <> host') of
           Left e -> Left (show e)
           Right x -> pure x
         peer <- o' .? "peer"
@@ -75,7 +79,7 @@ instance decodeJsonMoneroDLog :: DecodeJson MoneroDLog where
         top <- o' .? "top"
         peer <- o' .? "peer"
         host' <- o' .? "host"
-        host <- case runParser parser ("//" <> host') of
+        host <- case runParser Auth.parser ("//" <> host') of
           Left e -> Left (show e)
           Right x -> pure x
         days <- o' .? "days"
@@ -105,3 +109,41 @@ instance decodeJsonSyncPolarity :: DecodeJson SyncPolarity where
       _ | s == "INC" -> pure INC
         | s == "OUT" -> pure OUT
         | otherwise -> Left "Not a SyncPolarity"
+
+
+
+-- | Oneshot data type in unison, not sparesely
+type MoneroDConfigFile =
+  { maxConcurrency :: Int
+  , dataDir :: Path Abs File Sandboxed
+  , enforceDnsCheckpointing :: Boolean
+  , maxThreadsPrepBlocks :: Int
+  , fastBlockSync :: Boolean
+  , blockSyncSize :: Int
+  , p2pBindPort :: Int
+  , p2pBindIp :: Host
+  , p2pExternalPort :: Maybe Int
+  , hideMyPort :: Boolean
+  , noIgd :: Boolean
+  , offline :: Boolean
+  , maxOutPeers :: Maybe Int
+  , limitRateUp :: Maybe Int
+  , limitRateDown :: Maybe Int
+  , limitRate :: Maybe Int
+  , rpcBindPort :: Int
+  , rpcBindIp :: Host
+  , restrictedRpc :: Boolean
+  , rpcLoginName :: Maybe String
+  , rpcLoginPassword :: Maybe String
+  , confirmExternalBind :: Boolean
+  }
+
+
+-- instance encodeJsonMoneroDConfigFile :: EncodeJson MoneroDConfigFile where
+--   encodeJson (MoneroDConfigFile {..})
+--     =  "maxConcurrency" := maxConcurrency
+--     ~> "dataDir" := dataDir
+--     ~> "enforceDnsCheckpointing" := enforceDnsCheckpointing
+--     ~> "maxThreadsPrepBlocks" := maxThreadsPrepBlocks
+--     ~> "fastBlockSync" := fastBlockSync
+--     ~> "blockSyncSize" := blockSyncSize
