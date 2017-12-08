@@ -23,6 +23,7 @@ import Control.Monad.Aff (runAff_, delay, sequential, parallel)
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Exception (try)
 import Control.Monad.Eff.Uncurried (mkEffFn1)
+import Control.Monad.Eff.Unsafe (unsafeCoerceEff)
 import Control.Monad.Eff.Ref (REF)
 import Control.Monad.Eff.Class (liftEff)
 import Control.Monad.Eff.Console (CONSOLE, warn, log)
@@ -39,7 +40,6 @@ import DOM.HTML.Document (body)
 import Electron (ELECTRON)
 import Electron.Renderer (registerAsyncHandler, send)
 import Queue (newQueue, putQueue, onQueue)
-import Signal.Channel (CHANNEL)
 import MaterialUI.MuiThemeProvider (muiThemeProvider, createMuiTheme)
 import MaterialUI.AppBar (appBar)
 import MaterialUI.Button (button)
@@ -196,7 +196,6 @@ main :: forall eff
       . Eff ( dom :: DOM
             , ref :: REF
             , injectTapEvent :: INJECT_TAP_EVENT
-            , channel :: CHANNEL
             , electron :: ELECTRON
             , console :: CONSOLE
             | eff) Unit
@@ -244,8 +243,8 @@ main = do
             spec (initialState env)
           reactSpec' = reactSpec
             { componentDidMount = \this -> do
-                onQueue signalQueue (dispatcher this)
-                onQueue controlQueue (dispatcher this)
+                unsafeCoerceEff $ onQueue signalQueue (unsafeCoerceEff <<< dispatcher this)
+                unsafeCoerceEff $ onQueue controlQueue (unsafeCoerceEff <<< dispatcher this)
                 reactSpec.componentDidMount this
             }
           component = R.createClass reactSpec'

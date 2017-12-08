@@ -17,7 +17,6 @@ import Electron (ELECTRON, openWindow)
 import Node.Process (PROCESS, cwd)
 import DBus (DBUS, connectSession, getService)
 import Queue (onQueue)
-import Signal.Channel (CHANNEL)
 
 
 main :: forall eff
@@ -27,7 +26,6 @@ main :: forall eff
             , exception :: EXCEPTION
             , dbus      :: DBUS
             , ref       :: REF
-            , channel   :: CHANNEL
             | eff) Unit
 main = do
   as <- args

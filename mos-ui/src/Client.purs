@@ -24,7 +24,6 @@ import Electron (ELECTRON)
 import Electron.Main (registerAsyncHandler)
 import Node.Process (PROCESS)
 import Queue (putQueue)
-import Signal.Channel (CHANNEL)
 import Unsafe.Coerce (unsafeCoerce)
 
 
@@ -36,7 +35,6 @@ monerodoClient :: forall eff stM m
                            , electron  :: ELECTRON
                            , process   :: PROCESS
                            , ref       :: REF
-                           , channel   :: CHANNEL
                            | eff) stM m
                => m Unit
 monerodoClient = do

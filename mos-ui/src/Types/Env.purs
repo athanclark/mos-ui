@@ -8,15 +8,14 @@ import Data.Maybe (Maybe (..))
 import Data.Argonaut (class EncodeJson, class DecodeJson, encodeJson, decodeJson, (:=), (~>), jsonEmptyObject, (.?))
 import Control.Monad.Eff (Eff)
 import Control.Monad.Eff.Ref (REF)
-import Control.Monad.Eff.Exception (EXCEPTION, error, throwException)
+import Control.Monad.Eff.Exception (EXCEPTION, throw)
 import DBus (DBUS, Client, connectSession)
-import Queue (Queue, newQueue)
-import Signal.Channel (CHANNEL)
+import Queue.Internal (Queue, newQueue, READ, WRITE)
 
 
-newtype Env = Env
+newtype Env eff = Env
   { client :: Client
-  , signalQueue :: Queue SignalOutput
+  , signalQueue :: Queue (read :: READ, write :: WRITE) eff SignalOutput
   , development :: Boolean
   , monerodService :: String
   }
@@ -43,21 +42,21 @@ instance decodeJsonEnvData :: DecodeJson EnvData where
     pure $ EnvData
       {development,monerodService}
 
-toEnvData :: Env -> EnvData
+toEnvData :: forall eff. Env eff -> EnvData
 toEnvData (Env {development,monerodService}) = EnvData {development,monerodService}
+
+
+
+type Effects eff = (dbus :: DBUS, exception :: EXCEPTION, ref :: REF | eff)
 
 
 mkEnv :: forall eff
        . Args
-      -> Eff ( dbus :: DBUS
-             , channel :: CHANNEL
-             , exception :: EXCEPTION
-             , ref :: REF
-             | eff) Env
+      -> Eff (Effects eff) (Env (Effects eff))
 mkEnv (Args {development,monerodService}) = do
   mClient <- connectSession
   case mClient of
-    Nothing -> throwException $ error "Couldn't connect to dbus!"
+    Nothing -> throw "Couldn't connect to dbus!"
     Just client -> do
       signalQueue <- newQueue
       pure $ Env {development,client,signalQueue,monerodService}

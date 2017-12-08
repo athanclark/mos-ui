@@ -10,19 +10,19 @@ import Control.Monad.Reader.Class (class MonadReader)
 import Control.Monad.Trans.Control (class MonadBaseControl)
 
 
-type AppM eff = ReaderT Env (Eff eff)
+type AppM eff = ReaderT (Env eff) (Eff eff)
 
-runAppM :: forall eff a. Env -> AppM eff a -> Eff eff a
+runAppM :: forall eff a. Env eff -> AppM eff a -> Eff eff a
 runAppM e x = runReaderT x e
 
 class ( MonadEff eff m
-      , MonadReader Env m
+      , MonadReader (Env eff) m
       , MonadBaseControl (Eff eff) m stM
       , SingletonFunctor stM
       ) <= MonadApp eff stM m
 
 instance monadApp ::  ( MonadEff eff m
-                      , MonadReader Env m
+                      , MonadReader (Env eff) m
                       , MonadBaseControl (Eff eff) m stM
                       , SingletonFunctor stM
                       ) => MonadApp eff stM m

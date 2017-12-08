@@ -113,7 +113,7 @@ instance decodeJsonSyncPolarity :: DecodeJson SyncPolarity where
 
 
 -- | Oneshot data type in unison, not sparesely
-type MoneroDConfigFile =
+newtype MoneroDConfigFile = MoneroDConfigFile
   { maxConcurrency :: Int
   , dataDir :: Path Abs File Sandboxed
   , enforceDnsCheckpointing :: Boolean
@@ -139,11 +139,50 @@ type MoneroDConfigFile =
   }
 
 
--- instance encodeJsonMoneroDConfigFile :: EncodeJson MoneroDConfigFile where
---   encodeJson (MoneroDConfigFile {..})
---     =  "maxConcurrency" := maxConcurrency
---     ~> "dataDir" := dataDir
---     ~> "enforceDnsCheckpointing" := enforceDnsCheckpointing
---     ~> "maxThreadsPrepBlocks" := maxThreadsPrepBlocks
---     ~> "fastBlockSync" := fastBlockSync
---     ~> "blockSyncSize" := blockSyncSize
+instance encodeJsonMoneroDConfigFile :: EncodeJson MoneroDConfigFile where
+  encodeJson (MoneroDConfigFile { maxConcurrency
+                                , dataDir
+                                , enforceDnsCheckpointing
+                                , maxThreadsPrepBlocks
+                                , fastBlockSync
+                                , blockSyncSize
+                                , p2pBindPort
+                                , p2pBindIp
+                                , p2pExternalPort
+                                , hideMyPort
+                                , noIgd
+                                , offline
+                                , maxOutPeers
+                                , limitRateUp
+                                , limitRateDown
+                                , limitRate
+                                , rpcBindPort
+                                , rpcBindIp
+                                , restrictedRpc
+                                , rpcLoginName
+                                , rpcLoginPassword
+                                , confirmExternalBind
+                                })
+    =  "maxConcurrency" := maxConcurrency
+    ~> "dataDir" := (String.drop 2 $ show dataDir)
+    ~> "enforceDnsCheckpointing" := enforceDnsCheckpointing
+    ~> "maxThreadsPrepBlocks" := maxThreadsPrepBlocks
+    ~> "fastBlockSync" := fastBlockSync
+    ~> "blockSyncSize" := blockSyncSize
+    ~> "p2pBindPort" := p2pBindPort
+    ~> "p2pBindIp" := (Host.print p2pBindIp)
+    ~> "p2pExternalPort" := p2pExternalPort
+    ~> "hideMyPort" := hideMyPort
+    ~> "noIgd" := noIgd
+    ~> "offline" := offline
+    ~> "maxOutPeers" := maxOutPeers
+    ~> "limitRateUp" := limitRateUp
+    ~> "limitRateDown" := limitRateDown
+    ~> "limitRate" := limitRate
+    ~> "rpcBindPort" := rpcBindPort
+    ~> "rpcBindIp" := (Host.print rpcBindIp)
+    ~> "restrictedRpc" := restrictedRpc
+    ~> "rpcLoginName" := rpcLoginName
+    ~> "rpcLoginPassword" := rpcLoginPassword
+    ~> "confirmExternalBind" := confirmExternalBind
+    ~> jsonEmptyObject
