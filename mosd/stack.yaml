@@ -40,11 +40,11 @@ packages:
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
 extra-deps:
-  - attoparsec-ip-0.0.0
+  - attoparsec-ip-0.0.1
   - attoparsec-path-0.0.0.1
-  - attoparsec-uri-0.0.2
+  - attoparsec-uri-0.0.3
   - alternative-vector-0.0.0
-  - ip-0.9.3
+  - ip-1.1.0
   - follow-file-0.0.2
   - logging-3.0.4
 

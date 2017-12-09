@@ -28,9 +28,9 @@ import Data.Time (UTCTime)
 import Data.Time.LocalTime (TimeZone, localTimeToUTC)
 import Data.Vector (Vector)
 import Data.Aeson (ToJSON (..), FromJSON (..), (.:), (.=), object, Value (Object, String))
-import Data.Maybe (fromMaybe)
 import Data.Aeson.Types (typeMismatch)
 import Data.Default (Default, def)
+import Data.Maybe (fromMaybe)
 import Control.Applicative (optional, (<|>), many)
 import Control.Alternative.Vector (manyV)
 import Control.Monad (void)
@@ -40,8 +40,8 @@ import Text.Read (readMaybe)
 import Path (Path, Abs, Rel, File, Dir, toFilePath, parseRelDir, mkAbsDir, mkRelFile, (</>))
 import Net.Types (IPv4, IPv6)
 import Net.IPv4 (fromOctets)
-import qualified Net.IPv4.Text as IPv4
-import qualified Net.IPv6.Text as IPv6
+import qualified Net.IPv4 as IPv4
+import qualified Net.IPv6 as IPv6
 import Language.Haskell.TH (runIO, stringE)
 import Unsafe.Coerce (unsafeCoerce)
 import System.Posix.User (getLoginName)
@@ -238,6 +238,82 @@ data MoneroDConfigFile = MoneroDConfigFile
   , moneroDRpcLoginPassword :: Maybe Text
   , moneroDConfirmExternalBind :: Bool
   }
+
+instance ToJSON MoneroDConfigFile where
+  toJSON MoneroDConfigFile{..} = object
+    [ "maxConcurrency" .= moneroDMaxConcurrency
+    , "dataDir" .= moneroDDataDir
+    , "enforceDnsCheckpointing" .= moneroDEnforceDnsCheckpointing
+    , "maxThreadsPrepBlocks" .= moneroDMaxThreadsPrepBlocks
+    , "fastBlockSync" .= moneroDFastBlockSync
+    , "blockSyncSize" .= moneroDBlockSyncSize
+    , "p2pBindPort" .= moneroDP2pBindPort
+    , "p2pBindIp" .= moneroDP2pBindIp
+    , "p2pExternalPort" .= moneroDP2pExternalPort
+    , "hideMyPort" .= moneroDHideMyPort
+    , "noIgd" .= moneroDNoIgd
+    , "offline" .= moneroDOffline
+    , "maxOutPeers" .= moneroDMaxOutPeers
+    , "limitRateUp" .= moneroDLimitRateUp
+    , "limitRateDown" .= moneroDLimitRateDown
+    , "limitRate" .= moneroDLimitRate
+    , "rpcBindPort" .= moneroDRpcBindPort
+    , "rpcBindIp" .= moneroDRpcBindIp
+    , "restrictedRpc" .= moneroDRestrictedRpc
+    , "rpcLoginName" .= moneroDRpcLoginName
+    , "rpcLoginPassword" .= moneroDRpcLoginPassword
+    , "confirmExternalBind" .= moneroDConfirmExternalBind
+    ]
+
+instance FromJSON MoneroDConfigFile where
+  parseJSON (Object o) = do
+    moneroDMaxConcurrency <- o .: "maxConcurrency"
+    moneroDDataDir <- o .: "dataDir"
+    moneroDEnforceDnsCheckpointing <- o .: "enforceDnsCheckpointing"
+    moneroDMaxThreadsPrepBlocks <- o .: "maxThreadsPrepBlocks"
+    moneroDFastBlockSync <- o .: "fastBlockSync"
+    moneroDBlockSyncSize <- o .: "blockSyncSize"
+    moneroDP2pBindPort <- o .: "p2pBlockPort"
+    moneroDP2pBindIp <- o .: "p2pBindIp"
+    moneroDP2pExternalPort <- o .: "p2pExternalizePort"
+    moneroDHideMyPort <- o .: "hideMyPort"
+    moneroDNoIgd <- o .: "noIgd"
+    moneroDOffline <- o .: "offline"
+    moneroDMaxOutPeers <- o .: "maxOutPeers"
+    moneroDLimitRateUp <- o .: "limitRateUp"
+    moneroDLimitRateDown <- o .: "limitRateDown"
+    moneroDLimitRate <- o .: "limitRate"
+    moneroDRpcBindPort <- o .: "rpcBindPort"
+    moneroDRpcBindIp <- o .: "rpcBindIp"
+    moneroDRestrictedRpc <- o .: "restrictedRpc"
+    moneroDRpcLoginName <- o .: "rpcLoginName"
+    moneroDRpcLoginPassword <- o .: "rpcLoginPassword"
+    moneroDConfirmExternalBind <- o .: "confirmExternalBind"
+    pure MoneroDConfigFile
+      { moneroDMaxConcurrency
+      , moneroDDataDir
+      , moneroDEnforceDnsCheckpointing
+      , moneroDMaxThreadsPrepBlocks
+      , moneroDFastBlockSync
+      , moneroDBlockSyncSize
+      , moneroDP2pBindPort
+      , moneroDP2pBindIp
+      , moneroDP2pExternalPort
+      , moneroDHideMyPort
+      , moneroDNoIgd
+      , moneroDOffline
+      , moneroDMaxOutPeers
+      , moneroDLimitRateUp
+      , moneroDLimitRateDown
+      , moneroDLimitRate
+      , moneroDRpcBindPort
+      , moneroDRpcBindIp
+      , moneroDRestrictedRpc
+      , moneroDRpcLoginName
+      , moneroDRpcLoginPassword
+      , moneroDConfirmExternalBind
+      }
+  parseJSON x = typeMismatch "MoneroDConfigFile" x
 
 instance Show MoneroDConfigFile where
   show MoneroDConfigFile{..} = unlines

@@ -4,7 +4,7 @@
 
 module Types.DBus where
 
-import Monerodo.MoneroD (MoneroDLog)
+import Monerodo.MoneroD (MoneroDLog, MoneroDConfigFile)
 import System.SystemD.Status (SystemDStatus)
 
 import Data.Aeson (ToJSON (..), FromJSON (..), Value (..), encode, decode, (.:), (.=), object)
@@ -29,7 +29,14 @@ instance Show Service where
   show x = LT.unpack $ LT.decodeUtf8 $ encode x
 
 data AssignConfig
-  = MoneroDConfig 
+  = MoneroDConfig MoneroDConfigFile
+
+instance ToJSON AssignConfig where
+  toJSON (MoneroDConfig x) = object ["moneroDConfig" .= x]
+
+instance FromJSON AssignConfig where
+  parseJSON (Object o) = (MoneroDConfig <$> o .: "moneroDConfig")
+  parseJSON x = typeMismatch "AssignConfig" x
 
 data ControlInput
   = GetServiceState (Maybe Service)
@@ -45,6 +52,7 @@ instance ToJSON ControlInput where
   toJSON (GetServiceState mService) = object
     [ "getServiceState" .= mService
     ]
+  toJSON (AssignConfig x) = object ["assignConfig" .= x]
 
 instance IsVariant ControlInput where
   toVariant x = toVariant $ LT.decodeUtf8 $ encode x

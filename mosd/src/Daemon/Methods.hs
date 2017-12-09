@@ -8,7 +8,7 @@ module Daemon.Methods where
 
 import Types (MonadApp)
 import Types.Env (Env (..))
-import Types.DBus (Service (..), ControlInput (..), ControlOutput (..), SignalOutput)
+import Types.DBus (Service (..), ControlInput (..), ControlOutput (..), SignalOutput, AssignConfig (..))
 import System.SystemD.Status (getServiceStatus)
 
 import Data.Text (Text)
@@ -42,6 +42,10 @@ control (GetServiceState mService) = do
       Right x -> pure x
   log' $ "Service states: " <> T.pack (show xs)
   pure (GotServiceState xs)
+control (AssignConfig x) = case x of
+  MoneroDConfig cfg -> do
+    log' "Applying monerod config"
+    -- FIXME write config
 
 
 signals :: MonadApp stM m => IORef (V.Vector SignalOutput) -> m (V.Vector SignalOutput)
